@@ -345,6 +345,20 @@ def _extract_with_playwright_async(share_url: str) -> tuple[list[str], list[str]
         return future.result(timeout=120)
 
 
+def _safe_decode_json_str(raw: str) -> str:
+    """Safely decode a JSON-escaped string (handles unicode escapes like \\u002F).
+    Falls back to unicode_escape decode if JSON parsing fails."""
+    try:
+        return json.loads('"' + raw + '"')
+    except json.JSONDecodeError:
+        pass
+    try:
+        return raw.encode('utf-8').decode('unicode_escape')
+    except (UnicodeDecodeError, UnicodeEncodeError):
+        pass
+    return raw
+
+
 def _extract_douyin(url: str) -> dict:
     """Extract Douyin video or photo note info by scraping the mobile share page."""
     item_id, content_type = _resolve_douyin(url)
@@ -359,16 +373,13 @@ def _extract_douyin(url: str) -> dict:
     title = "未知标题"
     desc_match = re.search(r'"desc":"([^"]{1,300})"', html)
     if desc_match:
-        title = json.loads('"' + desc_match.group(1) + '"')
+        title = _safe_decode_json_str(desc_match.group(1))
 
     # Extract thumbnail (cover image, prefer high-res)
     thumbnail = ""
     cover_urls = re.findall(r"https:[^\"\s]*douyinpic\.com[^\"\s]*", html)
     for raw in cover_urls:
-        try:
-            decoded = json.loads('"' + raw + '"')
-        except json.JSONDecodeError:
-            decoded = raw
+        decoded = _safe_decode_json_str(raw)
         if "avatar" in decoded or "100x100" in decoded:
             continue
         if not thumbnail or "1080x1080" in decoded:
@@ -380,7 +391,7 @@ def _extract_douyin(url: str) -> dict:
     music_url = ""
     music_match = re.search(r'"play_addr":\{"uri":"([^"]+\.mp3)"', html)
     if music_match:
-        music_url = json.loads('"' + music_match.group(1) + '"')
+        music_url = _safe_decode_json_str(music_match.group(1))
 
     if content_type == "note":
         # Extract all images from photo note (use bracket counting for nested JSON)
@@ -404,10 +415,7 @@ def _extract_douyin(url: str) -> dict:
             for block in re.finditer(r'"url_list":\[\"(https?:[^\"]+)"', img_data):
                 raw = block.group(1)
                 raw = raw.replace("\\u002F", "/")
-                try:
-                    img_url = json.loads('"' + raw + '"')
-                except json.JSONDecodeError:
-                    img_url = raw
+                img_url = _safe_decode_json_str(raw)
                 # Only keep content images, skip music covers etc.
                 if 'tos-cn-i-' not in img_url:
                     continue
@@ -465,7 +473,7 @@ def _extract_douyin(url: str) -> dict:
         wm_url = play_match.group(1)
         wm_url = wm_url.replace("\\u002F", "/")
         try:
-            wm_url = json.loads('"' + wm_url + '"')
+            wm_url = _safe_decode_json_str(wm_url)
         except json.JSONDecodeError:
             pass
         video_url = wm_url.replace("/playwm/", "/play/")
@@ -479,7 +487,7 @@ def _extract_douyin(url: str) -> dict:
             video_url = uri_match.group(1)
             video_url = video_url.replace("\\u002F", "/")
             try:
-                video_url = json.loads('"' + video_url + '"')
+                video_url = _safe_decode_json_str(video_url)
             except json.JSONDecodeError:
                 pass
 
