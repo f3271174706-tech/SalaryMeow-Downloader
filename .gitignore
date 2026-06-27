@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+config.yaml
+DEPLOY.md
+static/index.html.bak
+downloads/
+logs/
+*.log

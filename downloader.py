@@ -1,5 +1,7 @@
+import asyncio
 import json
 import os
+import platform
 import re
 import subprocess
 import threading
@@ -9,6 +11,64 @@ import uuid
 from pathlib import Path
 
 import httpx
+
+from config import config, get_logger, setup_logging
+from utils import (
+    RequestError,
+    curl_download,
+    curl_get,
+    detect_platform,
+    extract_url,
+    get_with_retry,
+    post_with_retry,
+)
+
+# 初始化日志系统
+setup_logging()
+logger = get_logger(__name__)
+
+
+def _playwright_launch_args() -> dict:
+    """Return platform-appropriate Playwright launch args."""
+    if platform.system() == "Windows":
+        return {"channel": "msedge"}
+    return {"executable_path": "/snap/bin/chromium", "args": ["--no-sandbox"]}
+
+# 浏览器池 - 复用浏览器实例，避免每次启动
+_browser_pool = []
+_browser_lock = threading.Lock()
+_playwright_instance = None
+
+def _get_browser():
+    """获取浏览器实例（复用池中的实例）"""
+    global _playwright_instance
+    with _browser_lock:
+        if _browser_pool:
+            browser = _browser_pool.pop()
+            # 检查浏览器是否还可用
+            try:
+                if browser.is_connected():
+                    return browser, None
+            except:
+                pass
+
+        # 需要创建新实例
+        from playwright.sync_api import sync_playwright
+        if _playwright_instance is None:
+            _playwright_instance = sync_playwright().start()
+        browser = _playwright_instance.chromium.launch(headless=True, **_playwright_launch_args())
+        return browser, _playwright_instance
+
+def _return_browser(browser):
+    """归还浏览器实例到池中"""
+    with _browser_lock:
+        try:
+            if browser.is_connected():
+                _browser_pool.append(browser)
+            else:
+                browser.close()
+        except:
+            pass
 
 DOWNLOADS_DIR = Path(__file__).parent / "downloads"
 
@@ -136,8 +196,10 @@ def _extract_images_with_playwright(share_url: str) -> tuple[list[str], list[str
     video_urls = []
     images = []
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+    # 从浏览器池获取实例
+    browser, pw = _get_browser()
+    page = None
+    try:
         page = browser.new_page()
         page.goto(share_url, wait_until='domcontentloaded', timeout=15000)
 
@@ -225,7 +287,18 @@ def _extract_images_with_playwright(share_url: str) -> tuple[list[str], list[str
         video_urls = all_data.get('videos', [])
         images = all_data.get('images', [])
 
-        browser.close()
+        page.close()
+        _return_browser(browser)
+
+    except Exception as e:
+        logger.error(f"Playwright 提取失败: {e}")
+        if page:
+            try:
+                page.close()
+            except:
+                pass
+        _return_browser(browser)
+        return [], []
 
     return video_urls, images
 
@@ -246,7 +319,7 @@ def _extract_with_playwright_async(share_url: str) -> tuple[list[str], list[str]
         images = []
 
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
+            browser = await p.chromium.launch(headless=True, **_playwright_launch_args())
             page = await browser.new_page()
             await page.goto(share_url, wait_until='domcontentloaded', timeout=15000)
 
@@ -294,13 +367,13 @@ def _extract_with_playwright_async(share_url: str) -> tuple[list[str], list[str]
                 await page.wait_for_timeout(400)
 
             # Batch extract via JS - container scoped + filters + dedup by ID
-            all_data = await page.evaluate('''() => {
+            all_data = await page.evaluate(r'''() => {
                 const videos = [];
                 const seenPaths = new Set();
                 document.querySelectorAll('video source').forEach(el => {
                     const src = el.src || el.getAttribute('src') || '';
                     if (!src || !src.includes('douyinvod')) return;
-                    const pm = src.match(/douyinvod\\.com\\/[^\\/]+\\/[^\\/]+(\\/video\\/[^?]+)/);
+                    const pm = src.match(/douyinvod\.com\/[^\/]+\/[^\/]+(\/video\/[^?]+)/);
                     const path = pm ? pm[1] : src;
                     if (seenPaths.has(path)) return;
                     seenPaths.add(path);
@@ -428,6 +501,26 @@ def _extract_douyin(url: str) -> dict:
         has_video_hint = '"img_bitrate":null' in html
         # Do NOT use len(images) <= 1 — single-image posts are valid and don't need Playwright
         if (has_video_hint or len(images) == 0 or len(html) < 10000):
+            # 优先使用 API 模式解析动图（比 Playwright 快 3-7 倍）
+            if has_video_hint and config.get("api.enabled", True):
+                try:
+                    from douyin_api import _extract_douyin_api
+                    import concurrent.futures
+                    logger.info(f"动图帖使用 API 模式: {share_url}")
+                    # 在新线程中运行，避免 asyncio 事件循环冲突
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(asyncio.run, _extract_douyin_api(share_url))
+                        api_result = future.result(timeout=15)
+                    if api_result and api_result.get("type") == "live_photo":
+                        logger.info(f"API 解析动图成功: {api_result.get('title', '')[:30]}...")
+                        return api_result
+                    else:
+                        logger.warning("API 未返回动图结果，回退到 Playwright")
+                except Exception as e:
+                    logger.warning(f"API 解析动图失败，回退到 Playwright: {e}")
+
+            # 回退到 Playwright（慢，但兼容性好）
+            logger.info(f"使用 Playwright 解析动图: {share_url}")
             try:
                 pw_videos, pw_images = _extract_with_playwright_async(share_url)
                 if pw_images:
@@ -785,24 +878,68 @@ def apply_quality(video_url: str, quality: str) -> str:
 
 
 def extract_video_info(url: str) -> dict:
-    """Extract media metadata. Routes to platform-specific extractors."""
+    """Extract media metadata. Routes to platform-specific extractors.
+    优先使用 API，失败时回退到爬虫。"""
     url = _extract_url(url)
     cached = _cache_get(url)
     if cached:
+        logger.debug(f"缓存命中: {url[:50]}...")
         return {k: v for k, v in cached.items() if not k.startswith("_")}
 
+    # 检测平台
     if _is_douyin(url):
-        info = _extract_douyin(url)
+        platform = "douyin"
     elif _is_twitter(url):
-        info = _extract_twitter(url)
+        platform = "twitter"
     elif _is_bilibili(url):
-        info = _extract_bilibili(url)
+        platform = "bilibili"
     elif _is_kuaishou(url):
-        info = _extract_kuaishou(url)
+        platform = "kuaishou"
     elif _is_tiktok(url):
-        info = _extract_tiktok(url)
+        platform = "tiktok"
     else:
         raise ValueError("不支持的平台链接")
+
+    logger.info(f"解析链接: {url[:50]}... (平台: {platform})")
+
+    # 优先使用 API（抖音、TikTok、B站）
+    info = None
+    if config.get("api.enabled", True) and platform in ["douyin", "tiktok", "bilibili"]:
+        try:
+            from douyin_api import _extract_douyin_api, _extract_tiktok_api
+            import concurrent.futures
+            logger.info(f"尝试使用 API 模式: {platform}")
+            # 在新线程中运行，避免 asyncio 事件循环冲突
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                if platform == "douyin":
+                    future = executor.submit(asyncio.run, _extract_douyin_api(url))
+                elif platform == "tiktok":
+                    future = executor.submit(asyncio.run, _extract_tiktok_api(url))
+                else:
+                    future = None
+                if future:
+                    info = future.result(timeout=30)
+            if info:
+                logger.info(f"API 提取成功: {info.get('title', '')[:30]}...")
+            else:
+                logger.warning(f"API 返回 None，回退到爬虫")
+        except Exception as e:
+            logger.warning(f"API 提取失败，回退到爬虫: {e}")
+
+    # API 失败或不支持时，使用爬虫
+    if info is None:
+        logger.info(f"使用爬虫模式: {platform}")
+        if platform == "douyin":
+            info = _extract_douyin(url)
+        elif platform == "twitter":
+            info = _extract_twitter(url)
+        elif platform == "bilibili":
+            info = _extract_bilibili(url)
+        elif platform == "kuaishou":
+            info = _extract_kuaishou(url)
+        elif platform == "tiktok":
+            info = _extract_tiktok(url)
+
     _cache_set(url, info)
     return {k: v for k, v in info.items() if not k.startswith("_")}
 
@@ -916,8 +1053,11 @@ def download_video(
                     f.write(r.content)
                 _schedule_cleanup(filepath)
                 return filepath, filename
+            elif len(info.get("images", [])) > 1:
+                # 多张图片 - 并行下载并打包 zip
+                filepath, filename = _download_photos_parallel(info)
             else:
-                # image type → download single photo
+                # 单张图片
                 filepath, filename = _download_single_photo(info, image_index)
         elif info["type"] == "live_photo":
             # Live photos / animated images
@@ -999,17 +1139,24 @@ def _download_live_photos(info: dict) -> tuple[str, str]:
     safe_title = re.sub(r'[\n\r\t\\/*?:"<>|#]', '', info["title"])[:50] or uuid.uuid4().hex[:12]
     headers = {"User-Agent": MOBILE_UA, "Referer": "https://www.douyin.com/"}
 
-    # Download each video clip, filter out invalid ones
-    vid_paths = []
-    for i, url in enumerate(video_urls):
-        r = httpx.get(url, headers=headers, follow_redirects=True, timeout=120)
-        # Skip invalid responses (HTML error pages, empty content)
-        if len(r.content) < 1000 or r.content[:1] == b'<':
-            continue
-        vid_path = str(DOWNLOADS_DIR / f"_live_{i}_{uuid.uuid4().hex[:4]}.mp4")
-        with open(vid_path, "wb") as f:
-            f.write(r.content)
-        vid_paths.append(vid_path)
+    # 并行下载视频片段
+    def download_single_video(i_url):
+        i, url = i_url
+        try:
+            r = httpx.get(url, headers=headers, follow_redirects=True, timeout=120)
+            if len(r.content) < 1000 or r.content[:1] == b'<':
+                return None
+            vid_path = str(DOWNLOADS_DIR / f"_live_{i}_{uuid.uuid4().hex[:4]}.mp4")
+            with open(vid_path, "wb") as f:
+                f.write(r.content)
+            return vid_path
+        except Exception as e:
+            logger.warning(f"下载动图视频失败 [{i}]: {e}")
+            return None
+
+    # 使用线程池并行下载
+    with threading.ThreadPoolExecutor(max_workers=min(len(video_urls), 4)) as executor:
+        vid_paths = list(filter(None, executor.map(download_single_video, enumerate(video_urls))))
 
     if len(vid_paths) == 1:
         # Only one video, rename and return
@@ -1152,6 +1299,71 @@ def _download_single_photo(info: dict, index: int = 0) -> tuple[str, str]:
 
     _schedule_cleanup(filepath)
     return filepath, filename
+
+
+def _download_photos_parallel(info: dict) -> tuple[str, str]:
+    """并行下载多张图片并打包成 zip"""
+    images = info.get("images", [])
+    if not images:
+        raise ValueError("未能提取图片地址")
+
+    safe_title = re.sub(r'[\n\r\t\\/*?:"<>|#]', '', info["title"])[:50] or uuid.uuid4().hex[:12]
+    headers = {"User-Agent": MOBILE_UA, "Referer": "https://www.iesdouyin.com/"}
+
+    def download_single(i_url):
+        i, url = i_url
+        try:
+            r = httpx.get(url, headers=headers, follow_redirects=True, timeout=60)
+            # Determine extension
+            ct = r.headers.get("content-type", "")
+            if "jpeg" in ct or "jpg" in ct:
+                ext = ".jpg"
+            elif "png" in ct:
+                ext = ".png"
+            elif "gif" in ct:
+                ext = ".gif"
+            elif "webp" in ct:
+                ext = ".webp"
+            else:
+                ext = ".webp"
+
+            filename = f"{safe_title}_{i+1}{ext}"
+            filepath = str(DOWNLOADS_DIR / filename)
+            with open(filepath, "wb") as f:
+                f.write(r.content)
+            return filepath
+        except Exception as e:
+            logger.warning(f"下载图片失败 [{i}]: {e}")
+            return None
+
+    # 使用线程池并行下载
+    with threading.ThreadPoolExecutor(max_workers=min(len(images), 4)) as executor:
+        photo_paths = list(filter(None, executor.map(download_single, enumerate(images))))
+
+    if not photo_paths:
+        raise ValueError("无法下载图片")
+
+    # 如果只有一张图片，直接返回
+    if len(photo_paths) == 1:
+        _schedule_cleanup(photo_paths[0])
+        return photo_paths[0], os.path.basename(photo_paths[0])
+
+    # 多张图片打包成 zip
+    import zipfile
+    zip_path = str(DOWNLOADS_DIR / f"{safe_title}.zip")
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for p in photo_paths:
+            zf.write(p, os.path.basename(p))
+
+    # 清理临时图片文件
+    for p in photo_paths:
+        try:
+            os.remove(p)
+        except OSError:
+            pass
+
+    _schedule_cleanup(zip_path)
+    return zip_path, f"{safe_title}.zip"
 
 
 def _download_tiktok(url: str) -> tuple[str, str]:

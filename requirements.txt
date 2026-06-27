@@ -1,4 +1,8 @@
 fastapi
 uvicorn[standard]
-yt-dlp
 httpx
+PyYAML
+f2
+TikTokApi
+playwright
+pydantic
