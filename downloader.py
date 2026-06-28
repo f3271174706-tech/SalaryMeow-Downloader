@@ -1,4 +1,5 @@
 import asyncio
+import concurrent.futures
 import json
 import os
 import platform
@@ -49,7 +50,7 @@ def _get_browser():
             try:
                 if browser.is_connected():
                     return browser, None
-            except:
+            except Exception:
                 pass
 
         # 需要创建新实例
@@ -67,7 +68,7 @@ def _return_browser(browser):
                 _browser_pool.append(browser)
             else:
                 browser.close()
-        except:
+        except Exception:
             pass
 
 DOWNLOADS_DIR = Path(__file__).parent / "downloads"
@@ -92,18 +93,29 @@ httpx.post = _post
 # Simple in-memory cache to avoid hitting Douyin repeatedly for the same URL
 _cache: dict = {}
 _CACHE_TTL = 600  # 10 minutes
+_CACHE_MAX_SIZE = 500  # 最大缓存条目数
 
 
 def _cache_get(key: str):
     entry = _cache.get(key)
     if entry and time.time() - entry["_ts"] < _CACHE_TTL:
         return entry
+    # 过期条目删除
+    if entry:
+        del _cache[key]
     return None
 
 
 def _cache_set(key: str, info: dict):
+    # 如果缓存已满，删除最旧的条目
+    if len(_cache) >= _CACHE_MAX_SIZE:
+        oldest_key = min(_cache.keys(), key=lambda k: _cache[k].get("_ts", 0))
+        del _cache[oldest_key]
     info["_ts"] = time.time()
     _cache[key] = info
+
+# 共享线程池，避免反复创建
+_thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=8)
 
 MOBILE_UA = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) "
@@ -291,11 +303,11 @@ def _extract_images_with_playwright(share_url: str) -> tuple[list[str], list[str
         _return_browser(browser)
 
     except Exception as e:
-        logger.error(f"Playwright 提取失败: {e}")
+        logger.error(f"Playwright 提取失败: {e}", exc_info=True)
         if page:
             try:
                 page.close()
-            except:
+            except Exception:
                 pass
         _return_browser(browser)
         return [], []
@@ -412,10 +424,8 @@ def _extract_with_playwright_async(share_url: str) -> tuple[list[str], list[str]
         return video_urls, images
 
     # Run in a new thread to avoid asyncio conflicts
-    import concurrent.futures
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        future = executor.submit(asyncio.run, _extract())
-        return future.result(timeout=120)
+    future = _thread_pool.submit(asyncio.run, _extract())
+    return future.result(timeout=120)
 
 
 def _safe_decode_json_str(raw: str) -> str:
@@ -505,12 +515,10 @@ def _extract_douyin(url: str) -> dict:
             if has_video_hint and config.get("api.enabled", True):
                 try:
                     from douyin_api import _extract_douyin_api
-                    import concurrent.futures
                     logger.info(f"动图帖使用 API 模式: {share_url}")
                     # 在新线程中运行，避免 asyncio 事件循环冲突
-                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                        future = executor.submit(asyncio.run, _extract_douyin_api(share_url))
-                        api_result = future.result(timeout=15)
+                    future = _thread_pool.submit(asyncio.run, _extract_douyin_api(share_url))
+                    api_result = future.result(timeout=15)
                     if api_result and api_result.get("type") == "live_photo":
                         logger.info(f"API 解析动图成功: {api_result.get('title', '')[:30]}...")
                         return api_result
@@ -539,7 +547,7 @@ def _extract_douyin(url: str) -> dict:
                         "platform": "douyin",
                     }
             except Exception as e:
-                print(f"[playwright] Error: {e}")  # Debug
+                logger.error(f"Playwright 提取失败: {e}", exc_info=True)
 
         return {
             "title": title,
@@ -595,10 +603,8 @@ def _extract_douyin(url: str) -> dict:
 
 
 def _extract_tiktok(url: str) -> dict:
-    """Extract TikTok video info via ssstiktok.cc (no proxy needed)."""
+    """Extract TikTok video info via ssstiktok.cc (fast, no proxy needed)."""
     import subprocess, tempfile
-
-    # Step 1: POST to ssstiktok.cc to get preview token
     r = httpx.post("https://ssstiktok.cc/",
                    data={"url": url, "mode": "video"},
                    headers={"User-Agent": MOBILE_UA, "Referer": "https://ssstiktok.cc/"},
@@ -672,12 +678,12 @@ def _curl_get(url: str, timeout: int = 30) -> str:
     return result.stdout.decode("utf-8", errors="replace")
 
 
-def _curl_download(url: str, filepath: str, timeout: int = 120, headers: dict = None) -> int:
+def _curl_download(url: str, filepath: str, timeout: int = 120, headers: dict = None, use_proxy: bool = False) -> int:
     """Use subprocess curl to download a file. Returns file size."""
     import subprocess
     cmd = ["curl", "-s", "-L", "--max-time", str(timeout), "-o", filepath]
-    proxy = os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY")
-    if proxy:
+    if use_proxy:
+        proxy = os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY") or "http://127.0.0.1:7890"
         cmd += ["--proxy", proxy]
     if headers:
         for k, v in headers.items():
@@ -770,6 +776,9 @@ def _extract_bilibili(url: str) -> dict:
             raise ValueError(f"无法从链接中提取 BV ID: {url}")
 
     headers = {"User-Agent": MOBILE_UA, "Referer": "https://www.bilibili.com/"}
+    bilibili_cookie = config.get_cookie("bilibili")
+    if bilibili_cookie:
+        headers["Cookie"] = bilibili_cookie
 
     # Step 1: Get video info
     info_url = f"https://api.bilibili.com/x/web-interface/view?bvid={bvid}"
@@ -786,7 +795,8 @@ def _extract_bilibili(url: str) -> dict:
         thumbnail = "https:" + thumbnail
 
     # Step 2: Get video stream URL (durl = single file, no need to merge)
-    play_url = f"https://api.bilibili.com/x/player/playurl?bvid={bvid}&cid={cid}&qn=80&fnval=0"
+    # qn: 16=360p, 32=480p, 64=720p, 80=1080p, 112=1080p+, 116=1080p60
+    play_url = f"https://api.bilibili.com/x/player/playurl?bvid={bvid}&cid={cid}&qn=112&fnval=0"
     r = httpx.get(play_url, headers=headers, timeout=15)
     play_data = r.json()
     if play_data.get("code") != 0:
@@ -811,6 +821,9 @@ def _extract_bilibili(url: str) -> dict:
 def _extract_kuaishou(url: str) -> dict:
     """Extract Kuaishou video info by scraping mobile share page."""
     headers = {"User-Agent": MOBILE_UA}
+    kuaishou_cookie = config.get_cookie("kuaishou")
+    if kuaishou_cookie:
+        headers["Cookie"] = kuaishou_cookie
     r = httpx.get(url, headers=headers, follow_redirects=True, timeout=15)
     html = r.text
     final_url = str(r.url)
@@ -902,29 +915,29 @@ def extract_video_info(url: str) -> dict:
 
     logger.info(f"解析链接: {url[:50]}... (平台: {platform})")
 
-    # 优先使用 API（抖音、TikTok、B站）
+    # 优先使用 API（仅抖音，TikTok/B站直接用爬虫）
     info = None
-    if config.get("api.enabled", True) and platform in ["douyin", "tiktok", "bilibili"]:
+    if config.get("api.enabled", True) and platform == "douyin":
         try:
-            from douyin_api import _extract_douyin_api, _extract_tiktok_api
-            import concurrent.futures
+            from douyin_api import _extract_douyin_api
             logger.info(f"尝试使用 API 模式: {platform}")
-            # 在新线程中运行，避免 asyncio 事件循环冲突
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                if platform == "douyin":
-                    future = executor.submit(asyncio.run, _extract_douyin_api(url))
-                elif platform == "tiktok":
-                    future = executor.submit(asyncio.run, _extract_tiktok_api(url))
-                else:
-                    future = None
-                if future:
-                    info = future.result(timeout=30)
+            future = _thread_pool.submit(asyncio.run, _extract_douyin_api(url))
+            info = future.result(timeout=15)
             if info:
                 logger.info(f"API 提取成功: {info.get('title', '')[:30]}...")
             else:
-                logger.warning(f"API 返回 None，回退到爬虫")
+                logger.warning(f"API 返回 None，切换 Cookie 重试")
+                # 切换 Cookie 重试一次
+                config.rotate_cookie(platform)
+                future = _thread_pool.submit(asyncio.run, _extract_douyin_api(url))
+                info = future.result(timeout=15)
+                if info:
+                    logger.info(f"Cookie 切换后 API 提取成功")
+                else:
+                    logger.warning(f"Cookie 切换后仍失败，回退到爬虫")
         except Exception as e:
             logger.warning(f"API 提取失败，回退到爬虫: {e}")
+    # TikTok 直接用爬虫（TikTokApi 在服务器上不稳定）
 
     # API 失败或不支持时，使用爬虫
     if info is None:
@@ -939,6 +952,10 @@ def extract_video_info(url: str) -> dict:
             info = _extract_kuaishou(url)
         elif platform == "tiktok":
             info = _extract_tiktok(url)
+
+    # 记录解析结果（用于管理后台）
+    if info:
+        logger.info(f"解析完成: url={url}, platform={platform}, type={info.get('type', 'unknown')}, title={info.get('title', '')[:50]}")
 
     _cache_set(url, info)
     return {k: v for k, v in info.items() if not k.startswith("_")}
@@ -1064,13 +1081,8 @@ def download_video(
                 _schedule_cleanup(filepath)
                 return filepath, filename
             elif len(info.get("images", [])) > 1:
-                # 多张图片 - 判断是下载单张还是全部
-                if image_index > 0:
-                    # Download Current - 下载指定索引的图片
-                    filepath, filename = _download_single_photo(info, image_index)
-                else:
-                    # Download All - 并行下载并打包 zip
-                    filepath, filename = _download_photos_all(info)
+                # 多张图片 - 下载指定索引的图片（前端 Download All 会逐张请求）
+                filepath, filename = _download_single_photo(info, image_index)
             else:
                 # 单张图片
                 filepath, filename = _download_single_photo(info, image_index)
@@ -1364,7 +1376,7 @@ def _download_twitter_video(url: str) -> tuple[str, str]:
     if video_url:
         try:
             headers = {"User-Agent": MOBILE_UA, "Referer": "https://x.com/"}
-            _curl_download(video_url, filepath, timeout=30, headers=headers)
+            _curl_download(video_url, filepath, timeout=30, headers=headers, use_proxy=True)
             if os.path.getsize(filepath) > 1000:
                 downloaded = True
         except Exception:
@@ -1449,8 +1461,9 @@ def _download_single_photo(info: dict, index: int = 0) -> tuple[str, str]:
     return filepath, filename
 
 
-def _download_photos_all(info: dict) -> tuple[str, str]:
-    """并行下载多张图片，返回第一张（移动端友好）"""
+
+def _download_all_photos(info: dict) -> list[tuple[str, str]]:
+    """并行下载所有图片，返回所有文件路径"""
     import concurrent.futures
     images = info.get("images", [])
     if not images:
@@ -1476,21 +1489,20 @@ def _download_photos_all(info: dict) -> tuple[str, str]:
             filepath = str(DOWNLOADS_DIR / filename)
             with open(filepath, "wb") as f:
                 f.write(r.content)
-            return filepath
+            _schedule_cleanup(filepath)
+            return (filepath, filename)
         except Exception as e:
             logger.warning(f"下载图片失败 [{i}]: {e}")
             return None
 
     # 并行下载所有图片
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(images), 4)) as executor:
-        photo_paths = list(filter(None, executor.map(download_single, enumerate(images))))
+        results = list(filter(None, executor.map(download_single, enumerate(images))))
 
-    if not photo_paths:
+    if not results:
         raise ValueError("无法下载图片")
 
-    # 返回第一张图片
-    _schedule_cleanup(photo_paths[0])
-    return photo_paths[0], os.path.basename(photo_paths[0])
+    return results
 
 
 def _download_tiktok(url: str) -> tuple[str, str]:

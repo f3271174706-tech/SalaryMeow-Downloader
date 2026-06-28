@@ -1166,6 +1166,43 @@ function buildPhotoSlider(count) {
   buildPhotoSliderIn(count, document.getElementById('photoDots'));
 }
 
+function buildLivePhotoSlider(count, container) {
+  // Build dot markers for live photos
+  let dotsHtml = '';
+  for (let i = 0; i < count; i++) {
+    const pct = (i / (count - 1)) * 100;
+    const isActive = i === 0;
+    const dotClass = isActive
+      ? 'slider-dot slider-dot-active-glow absolute w-[40px] h-[25px] -ml-[20px] rounded-full cursor-pointer hover:scale-125 transition-all border-2 border-white/80 bg-white/40 backdrop-blur-sm'
+      : 'slider-dot absolute w-1.5 h-1.5 -ml-[3px] rounded-full cursor-pointer hover:scale-125 transition-all bg-blue-300/60 hover:bg-blue-300';
+    const innerHtml = isActive
+      ? '<div class="absolute inset-0 rounded-full backdrop-blur-sm bg-gradient-to-br from-blue-400/10 via-purple-500/10 to-pink-400/10 animate-pulse"></div>'
+      : '';
+    dotsHtml += `<div class="${dotClass}"
+      style="left: ${pct}%; top: 50%; transform: translateY(-50%); z-index: 15; pointer-events: none"
+      >${innerHtml}</div>`;
+  }
+
+  container.innerHTML = `
+    <div class="relative flex items-center gap-3 w-full px-2">
+      <div class="relative flex-1 h-6 flex items-center">
+        <!-- Background track -->
+        <div class="absolute w-full h-[3px] bg-black/5 rounded-full z-0"></div>
+        <!-- Fill track - glowing stream -->
+        <div id="livePhotoSliderFill" class="slider-fill-stream absolute z-10"
+          style="width: 0"></div>
+        <!-- Dot markers -->
+        ${dotsHtml}
+        <!-- Slider input -->
+        <input id="livePhotoSlider" type="range" min="0" max="${count - 1}" value="0"
+          class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+          oninput="showLivePhoto(parseInt(this.value))">
+      </div>
+      <span id="livePhotoSliderLabel" class="text-xs text-black/50 font-mono min-w-[3rem] text-right">1/${count}</span>
+    </div>
+  `;
+}
+
 function buildPhotoSliderIn(count, container) {
   // Build dot markers
   let dotsHtml = '';
@@ -1211,6 +1248,27 @@ function showLivePhoto(idx) {
   p.src = '/api/stream?video_url=' + encodeURIComponent(currentVideoUrl) + '&quality=' + currentQuality;
   p.load();
   p.play().catch(() => {});
+
+  // Update slider if exists
+  const slider = document.getElementById('livePhotoSlider');
+  if (slider) {
+    slider.value = idx;
+    const label = document.getElementById('livePhotoSliderLabel');
+    if (label) label.textContent = (idx + 1) + '/' + currentLivePhotos.length;
+    // Update fill
+    const fill = document.getElementById('livePhotoSliderFill');
+    if (fill) fill.style.width = (idx / (currentLivePhotos.length - 1) * 100) + '%';
+    // Update dots
+    document.querySelectorAll('#livePhotoSliderWrap .slider-dot').forEach((d, i) => {
+      if (i === idx) {
+        d.className = 'slider-dot slider-dot-active-glow absolute w-[40px] h-[25px] -ml-[20px] rounded-full cursor-pointer hover:scale-125 transition-all border-2 border-white/80 bg-white/40 backdrop-blur-sm';
+      } else {
+        d.className = 'slider-dot absolute w-1.5 h-1.5 -ml-[3px] rounded-full cursor-pointer hover:scale-125 transition-all bg-blue-300/60 hover:bg-blue-300';
+      }
+    });
+  }
+
+  // Update dots buttons if exists
   document.querySelectorAll('#photoDots button').forEach((d, i) => {
     d.className = i === idx ? 'w-2 h-2 rounded-full bg-black/40' : 'w-2 h-2 rounded-full bg-black/10';
   });
@@ -1420,22 +1478,30 @@ function buildResult(data) {
       pWrap.classList.add('hidden');
     }
 
-    // Show dots for videos + images
+    // Show dots/sliders for live photos + images
     let ds = '';
-    currentLivePhotos.forEach((_, i) => { ds += `<button onclick="showLivePhoto(${i})" class="w-2 h-2 rounded-full ${i===0?'bg-black/40':'bg-black/10'}"></button>`; });
+    if (currentLivePhotos.length >= 3) {
+      // 3+ live photos: use slider
+      pDots.innerHTML = `<div id="livePhotoSliderWrap" class="w-full mb-2"></div>`;
+      buildLivePhotoSlider(currentLivePhotos.length, document.getElementById('livePhotoSliderWrap'));
+    } else {
+      // 1-2 live photos: use dots
+      currentLivePhotos.forEach((_, i) => { ds += `<button onclick="showLivePhoto(${i})" class="w-2 h-2 rounded-full ${i===0?'bg-black/40':'bg-black/10'}"></button>`; });
+    }
     if (currentImages.length > 0) {
       if (currentImages.length >= 3) {
-        // Live photo dots + separator + image slider
+        // 3+ images: use slider
         ds += `<span class="mx-1">|</span>`;
-        pDots.innerHTML = `<div class="flex items-center justify-center gap-2 mb-2">${ds}</div><div id="imageSliderWrap" class="w-full"></div>`;
+        pDots.innerHTML += `<div class="flex items-center justify-center gap-2 mb-2">${ds}</div><div id="imageSliderWrap" class="w-full"></div>`;
         buildPhotoSliderIn(currentImages.length, document.getElementById('imageSliderWrap'));
       } else {
+        // 1-2 images: use dots
         ds += `<span class="mx-1">|</span>`;
-        currentImages.forEach((_, i) => { ds += `<button onclick="showPhoto(${i})" class="w-2 h-2 rounded-full bg-black/10"}"></button>`; });
-        pDots.innerHTML = ds;
+        currentImages.forEach((_, i) => { ds += `<button onclick="showPhoto(${i})" class="w-2 h-2 rounded-full bg-black/10"></button>`; });
+        pDots.innerHTML += ds;
       }
     } else {
-      pDots.innerHTML = ds;
+      pDots.innerHTML += ds;
     }
     pDots.classList.remove('hidden');
 

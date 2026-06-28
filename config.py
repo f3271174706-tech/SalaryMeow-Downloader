@@ -9,6 +9,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+logger = logging.getLogger(__name__)
+
 import yaml
 
 # 项目根目录
@@ -79,6 +81,7 @@ class Config:
 
     _instance = None
     _config = None
+    _cookie_failed = {}  # 记录失败的 Cookie
 
     def __new__(cls):
         if cls._instance is None:
@@ -132,8 +135,43 @@ class Config:
         return value
 
     def get_cookie(self, platform: str) -> str:
-        """获取指定平台的 Cookie"""
-        return self.get(f"cookies.{platform}", "")
+        """获取指定平台的 Cookie（随机选择可用的）"""
+        import random
+        cookies = self.get(f"cookies.{platform}", "")
+        if isinstance(cookies, list):
+            # 过滤掉空 Cookie 和之前失败的
+            failed = self._cookie_failed.get(platform, set())
+            valid = [c for i, c in enumerate(cookies) if c and i not in failed]
+            if not valid:
+                # 所有都失败过，重置
+                self._cookie_failed[platform] = set()
+                valid = [c for c in cookies if c]
+            if valid:
+                return random.choice(valid)
+            return ""
+        return cookies if cookies else ""
+
+    def mark_cookie_failed(self, platform: str, cookie: str) -> None:
+        """标记 Cookie 失败（解析失败时调用）"""
+        cookies = self.get(f"cookies.{platform}", [])
+        if isinstance(cookies, list) and cookie in cookies:
+            idx = cookies.index(cookie)
+            if platform not in self._cookie_failed:
+                self._cookie_failed[platform] = set()
+            self._cookie_failed[platform].add(idx)
+            logger.info(f"[config] 标记 {platform} Cookie #{idx + 1} 失败")
+
+    def rotate_cookie(self, platform: str) -> str:
+        """切换到下一个 Cookie（解析失败时调用）"""
+        # 标记当前 Cookie 失败
+        cookies = self.get(f"cookies.{platform}", [])
+        if isinstance(cookies, list):
+            # 随机选择一个不同的
+            import random
+            valid = [c for c in cookies if c]
+            if valid:
+                return random.choice(valid)
+        return self.get_cookie(platform)
 
     def get_headers(self, platform: str = "", include_cookie: bool = True) -> Dict[str, str]:
         """

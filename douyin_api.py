@@ -52,19 +52,21 @@ async def _extract_tiktok_api(url: str) -> Optional[dict]:
 
             # 创建 session 并设置 cookie
             await api.create_sessions(
+                num_sessions=1,  # 只创建 1 个 session
                 headless=True,
                 cookies=[cookies],
                 browser="chromium",
                 proxies=proxies,
-                timeout=60000,  # 增加超时到 60 秒
-                allow_partial_sessions=True  # 允许部分 session 失败
+                timeout=15000,  # 15 秒超时
+                allow_partial_sessions=True
             )
         else:
             await api.create_sessions(
+                num_sessions=1,
                 headless=True,
                 browser="chromium",
                 proxies=proxies,
-                timeout=60000,
+                timeout=15000,
                 allow_partial_sessions=True
             )
 
@@ -155,7 +157,7 @@ async def _extract_douyin_api(url: str) -> Optional[dict]:
         logger.info(f"aweme_id: {aweme_id}")
 
         # 构建 kwargs
-        douyin_cookie = config.get("cookies.douyin", "")
+        douyin_cookie = config.get_cookie("douyin")
         kwargs = {
             'proxies': {'http://': None, 'https://': None},
             'headers': {
