@@ -1,0 +1,142 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "douyin-downloader"
+version = "3.0.0"
+description = "多平台无水印下载器 - 抖音/Twitter/TikTok/B站/快手"
+authors = [
+    {name = "fzp", email = "fzp@example.com"}
+]
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+keywords = ["douyin", "tiktok", "twitter", "bilibili", "kuaishou", "downloader"]
+
+# 项目依赖
+dependencies = [
+    "fastapi>=0.100.0,<1.0",
+    "uvicorn[standard]>=0.20.0",
+    "httpx>=0.24.0",
+    "PyYAML>=6.0",
+    "pydantic>=2.0.0",
+]
+
+# 可选依赖
+[project.optional-dependencies]
+full = [
+    "f2>=0.0.1.7",
+    "TikTokApi>=7.0.0",
+    "playwright>=1.40.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-asyncio>=0.21.0",
+    "ruff>=0.4.0",
+    "mypy>=1.0.0",
+    "pre-commit>=3.0.0",
+]
+
+# 项目入口点
+[project.scripts]
+douyin-downloader = "douyin_downloader.main:main"
+
+# 项目URL
+[project.urls]
+Homepage = "https://github.com/fzp/douyin-downloader"
+Repository = "https://github.com/fzp/douyin-downloader"
+
+# setuptools 配置
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# Ruff 配置
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+fix = true
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "E701",   # multiple statements on one line (colon)
+    "E702",   # multiple statements on one line (semicolon)
+    "B008",   # do not perform function calls in argument defaults
+    "N816",   # mixedCase variable in global scope
+    "RUF001", # ambiguous string (中文全角字符)
+    "RUF002", # ambiguous docstring
+    "RUF003", # ambiguous comment
+    "RUF012", # mutable class attribute
+    "RUF013", # implicit Optional
+    "B904",   # raise ... from err
+    "SIM101", # merge isinstance
+    "SIM105", # use contextlib.suppress
+    "SIM117", # combine with statements
+    "UP006",  # use built-in type
+    "UP035",  # deprecated typing import
+    "E402",   # module level import not at top
+    "F401",   # unused import
+    "F403",   # wildcard import
+    "F841",   # local variable assigned but never used
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["douyin_downloader"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# pytest 配置
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+# coverage 配置
+[tool.coverage.run]
+source = ["src"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == .__main__.",
+    "raise NotImplementedError",
+    "pass",
+    "except ImportError",
+]
+show_missing = true
+fail_under = 50
+
+# mypy 配置
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
