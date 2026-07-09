@@ -811,7 +811,11 @@ video::-webkit-media-controls-enclosure {
           <p id="progressText" class="text-[11px] text-black/30 mt-1.5 text-center"></p>
         </div>
 
+<<<<<<< HEAD
         <button onclick="if(currentAbortController){currentAbortController.abort();currentAbortController=null;} location.reload()" class="w-full text-xs text-red-400/60 hover:text-red-500/80 py-1 transition-colors">Reset</button>
+=======
+        <button onclick="location.reload()" class="w-full text-xs text-red-400/60 hover:text-red-500/80 py-1 transition-colors">Reset</button>
+>>>>>>> 30e4c2f26e62986a7a3b4d3de2e8e4497d49ece2
       </div>
     </div>
   </div>
@@ -850,34 +854,51 @@ for (let i = 0; i < TRAIL_COUNT; i++) {
 }
 
 const mousePos = { x: 0, y: 0, history: [] };
+<<<<<<< HEAD
 let trailMoving = false;
 let trailTimer = null;
+=======
+>>>>>>> 30e4c2f26e62986a7a3b4d3de2e8e4497d49ece2
 
 document.addEventListener('pointermove', e => {
   mousePos.x = e.clientX;
   mousePos.y = e.clientY;
   mousePos.history.push({ x: e.clientX, y: e.clientY });
   if (mousePos.history.length > TRAIL_COUNT) mousePos.history.shift();
+<<<<<<< HEAD
   trailMoving = true;
   clearTimeout(trailTimer);
   trailTimer = setTimeout(() => { trailMoving = false; }, 100);
+=======
+>>>>>>> 30e4c2f26e62986a7a3b4d3de2e8e4497d49ece2
 });
 
 // Clear trail when pointer leaves (prevents ghost trails on mobile)
 document.addEventListener('pointerleave', () => {
   mousePos.history = [];
+<<<<<<< HEAD
   trailMoving = false;
+=======
+>>>>>>> 30e4c2f26e62986a7a3b4d3de2e8e4497d49ece2
   trailDots.forEach(d => { d.el.style.opacity = '0'; });
 });
 document.addEventListener('pointercancel', () => {
   mousePos.history = [];
+<<<<<<< HEAD
   trailMoving = false;
+=======
+>>>>>>> 30e4c2f26e62986a7a3b4d3de2e8e4497d49ece2
   trailDots.forEach(d => { d.el.style.opacity = '0'; });
 });
 
 function updateTrail() {
+<<<<<<< HEAD
   // Skip trail rendering on mobile or when mouse is stationary
   if (!isMobile && trailMoving) {
+=======
+  // Skip trail rendering on mobile to avoid ghost trails
+  if (!isMobile) {
+>>>>>>> 30e4c2f26e62986a7a3b4d3de2e8e4497d49ece2
     for (let i = 0; i < TRAIL_COUNT; i++) {
       const idx = mousePos.history.length - 1 - i;
       if (idx >= 0) {
@@ -904,7 +925,10 @@ let currentUrl = '', currentQuality = '1080p', currentType = 'video';
 let currentVideoUrl = '', currentContentType = 'video';
 let currentImages = [], currentPhotoIdx = 0;
 let currentLivePhotos = [], currentLivePhotoIdx = 0;
+<<<<<<< HEAD
 let currentAbortController = null;  // 用于取消下载
+=======
+>>>>>>> 30e4c2f26e62986a7a3b4d3de2e8e4497d49ece2
 
 const card = document.getElementById('magicCard');
 const inputLayer = document.getElementById('inputLayer');
@@ -1011,11 +1035,14 @@ function animateToResult() {
 
 // ═══ Reset ═══
 function resetCard() {
+<<<<<<< HEAD
   // 打断正在进行的下载
   if (currentAbortController) {
     currentAbortController.abort();
     currentAbortController = null;
   }
+=======
+>>>>>>> 30e4c2f26e62986a7a3b4d3de2e8e4497d49ece2
   gsap.killTweensOf(card);
   gsap.killTweensOf(resultLayer);
   gsap.killTweensOf(inputLayer);
@@ -1053,6 +1080,7 @@ function resetCard() {
     opacity: 1, y: 0, duration: 0.3, stagger: 0.03, delay: 0.3, ease: 'power2.out',
   });
 
+<<<<<<< HEAD
   currentUrl = ''; currentVideoUrl = ''; currentContentType = 'video'; currentType = 'video';
   currentImages = []; currentPhotoIdx = 0;
   currentLivePhotos = []; currentLivePhotoIdx = 0;
@@ -1145,6 +1173,12 @@ async function readClipboard() {
       resolve(text || null);
     }, 200);
   });
+=======
+  currentUrl = ''; currentVideoUrl = ''; currentContentType = 'video';
+  document.getElementById('urlInput').value = '';
+  document.getElementById('parseBtn').disabled = false;
+  document.getElementById('downloadBtn').disabled = true;
+>>>>>>> 30e4c2f26e62986a7a3b4d3de2e8e4497d49ece2
 }
 
 // ═══ Actions ═══
@@ -1164,7 +1198,11 @@ async function pasteAndParse() {
   try { document.execCommand('paste'); } catch {}
   setTimeout(() => {
     if (tmp.value) { input.value = tmp.value; parseVideo(); }
+<<<<<<< HEAD
     else showToast('请长按输入框粘贴', 'info');
+=======
+    else showToast('Long press the input box to paste', 'info');
+>>>>>>> 30e4c2f26e62986a7a3b4d3de2e8e4497d49ece2
     tmp.remove();
   }, 200);
 }
@@ -1475,12 +1513,19 @@ async function parseVideo() {
   if (!text.startsWith('http://') && !text.startsWith('https://')) { text = 'https://' + text; }
   input.value = text; currentUrl = text;
   document.getElementById('parseBtn').disabled = true;
+<<<<<<< HEAD
   document.getElementById('downloadBtn').disabled = true;  // 解析期间禁用下载
+=======
+>>>>>>> 30e4c2f26e62986a7a3b4d3de2e8e4497d49ece2
 
   animateToDroplet();
 
   try {
+<<<<<<< HEAD
     const res = await fetch('/api/parse', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: text }), signal: AbortSignal.timeout(30000) });
+=======
+    const res = await fetch('/api/parse', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: text }) });
+>>>>>>> 30e4c2f26e62986a7a3b4d3de2e8e4497d49ece2
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || 'Parse failed');
     buildResult(data);
@@ -1512,7 +1557,10 @@ async function parseVideo() {
     inputLayer.classList.remove('hidden');
     gsap.fromTo(inputLayer, { opacity: 0, y: -8 }, { opacity: 1, y: 0, duration: 0.3, ease: 'power2.out' });
     document.getElementById('parseBtn').disabled = false;
+<<<<<<< HEAD
     document.getElementById('downloadBtn').disabled = false;  // 重置下载按钮状态
+=======
+>>>>>>> 30e4c2f26e62986a7a3b4d3de2e8e4497d49ece2
     showToast(e.message, 'error');
   }
 }
@@ -1633,6 +1681,7 @@ function buildResult(data) {
 }
 
 // ═══ Download ═══
+<<<<<<< HEAD
 async function _downloadWithProgress(body, { showProgress = true } = {}) {
   const progressWrap = document.getElementById('progressWrap');
   const progressBar = document.getElementById('progressBar');
@@ -1696,12 +1745,15 @@ function _showProgress() {
 function _hideProgress() {
   setTimeout(() => { document.getElementById('progressWrap').classList.add('hidden'); }, 3000);
 }
+=======
+>>>>>>> 30e4c2f26e62986a7a3b4d3de2e8e4497d49ece2
 async function downloadCurrentPhoto() {
   if (!currentUrl) return;
   const btn = document.getElementById('photoButtons').querySelector('button:first-child');
   btn.disabled = true;
   const origText = btn.textContent;
   btn.textContent = 'Downloading...';
+<<<<<<< HEAD
   currentAbortController = new AbortController();
   try {
     const { blob, fn } = await _downloadWithProgress({ url: currentUrl, type: 'image', image_index: currentPhotoIdx });
@@ -1714,6 +1766,20 @@ async function downloadCurrentPhoto() {
     btn.disabled = false; btn.textContent = origText;
     _hideProgress();
   }
+=======
+  try {
+    const res = await fetch('/api/download', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: currentUrl, type: 'image', image_index: currentPhotoIdx }) });
+    if (!res.ok) { const d = await res.json(); throw new Error(d.detail); }
+    const blob = await res.blob();
+    let fn = 'image.webp';
+    const disp = res.headers.get('Content-Disposition') || '';
+    const rfc = disp.match(/filename\*=(?:UTF-8|utf-8)''(.+?)(?:;|$)/i);
+    if (rfc) fn = decodeURIComponent(rfc[1]); else { const m = disp.match(/filename="?(.+?)"?$/); if (m) fn = m[1]; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fn;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(a.href);
+  } catch (e) { showToast(e.message || 'Failed', 'error'); }
+  finally { btn.disabled = false; btn.textContent = origText; }
+>>>>>>> 30e4c2f26e62986a7a3b4d3de2e8e4497d49ece2
 }
 
 async function downloadSlideshow() {
@@ -1722,6 +1788,7 @@ async function downloadSlideshow() {
   btn.disabled = true;
   const origText = btn.textContent;
   btn.textContent = 'Creating...';
+<<<<<<< HEAD
   currentAbortController = new AbortController();
   try {
     const { blob, fn } = await _downloadWithProgress({ url: currentUrl, type: 'video' });
@@ -1734,6 +1801,20 @@ async function downloadSlideshow() {
     btn.disabled = false; btn.textContent = origText;
     _hideProgress();
   }
+=======
+  try {
+    const res = await fetch('/api/download', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: currentUrl, type: 'video' }) });
+    if (!res.ok) { const d = await res.json(); throw new Error(d.detail); }
+    const blob = await res.blob();
+    let fn = 'slideshow.mp4';
+    const disp = res.headers.get('Content-Disposition') || '';
+    const rfc = disp.match(/filename\*=(?:UTF-8|utf-8)''(.+?)(?:;|$)/i);
+    if (rfc) fn = decodeURIComponent(rfc[1]); else { const m = disp.match(/filename="?(.+?)"?$/); if (m) fn = m[1]; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fn;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(a.href);
+  } catch (e) { showToast(e.message || 'Failed', 'error'); }
+  finally { btn.disabled = false; btn.textContent = origText; }
+>>>>>>> 30e4c2f26e62986a7a3b4d3de2e8e4497d49ece2
 }
 
 async function downloadAllPhotos() {
@@ -1741,6 +1822,7 @@ async function downloadAllPhotos() {
   const btn = document.getElementById('photoButtons').querySelector('button:nth-child(2)');
   btn.disabled = true;
   const origText = btn.textContent;
+<<<<<<< HEAD
   currentAbortController = new AbortController();
   let done = 0;
   const total = currentImages.length;
@@ -1789,6 +1871,30 @@ async function downloadAllPhotos() {
     btn.disabled = false;
     btn.textContent = origText;
   }
+=======
+  try {
+    for (let i = 0; i < currentImages.length; i++) {
+      btn.textContent = `Downloading ${i + 1}/${currentImages.length}...`;
+      const res = await fetch('/api/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: currentUrl, type: 'image', image_index: i })
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.detail); }
+      const blob = await res.blob();
+      let fn = `image_${i + 1}.webp`;
+      const disp = res.headers.get('Content-Disposition') || '';
+      const rfc = disp.match(/filename\*=(?:UTF-8|utf-8)''(.+?)(?:;|$)/i);
+      if (rfc) fn = decodeURIComponent(rfc[1]); else { const m = disp.match(/filename="?(.+?)"?$/); if (m) fn = m[1]; }
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fn;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(a.href);
+      // 等待一小段时间再下载下一张
+      if (i < currentImages.length - 1) await new Promise(r => setTimeout(r, 500));
+    }
+    showToast(`Downloaded ${currentImages.length} images`, 'success');
+  } catch (e) { showToast(e.message || 'Failed', 'error'); }
+  finally { btn.disabled = false; btn.textContent = origText; }
+>>>>>>> 30e4c2f26e62986a7a3b4d3de2e8e4497d49ece2
 }
 
 async function downloadLivePhoto() {
@@ -1797,6 +1903,7 @@ async function downloadLivePhoto() {
   btn.disabled = true;
   const origText = btn.textContent;
   btn.textContent = 'Converting...';
+<<<<<<< HEAD
   currentAbortController = new AbortController();
   try {
     const { blob, fn } = await _downloadWithProgress({ url: currentUrl, live_photo_format: true, live_photo_index: currentLivePhotoIdx || 0 });
@@ -1809,11 +1916,26 @@ async function downloadLivePhoto() {
     btn.disabled = false; btn.textContent = origText;
     _hideProgress();
   }
+=======
+  try {
+    const res = await fetch('/api/download', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: currentUrl, live_photo_format: true }) });
+    if (!res.ok) { const d = await res.json(); throw new Error(d.detail); }
+    const blob = await res.blob();
+    let fn = 'live_photo.mov';
+    const disp = res.headers.get('Content-Disposition') || '';
+    const rfc = disp.match(/filename\*=(?:UTF-8|utf-8)''(.+?)(?:;|$)/i);
+    if (rfc) fn = decodeURIComponent(rfc[1]); else { const m = disp.match(/filename="?(.+?)"?$/); if (m) fn = m[1]; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fn;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(a.href);
+  } catch (e) { showToast(e.message || 'Failed', 'error'); }
+  finally { btn.disabled = false; btn.textContent = origText; }
+>>>>>>> 30e4c2f26e62986a7a3b4d3de2e8e4497d49ece2
 }
 
 async function downloadLivePhotoAsVideo() {
   if (!currentUrl) return;
   const btn = document.getElementById('downloadBtn'); btn.disabled = true;
+<<<<<<< HEAD
   const textEl = document.getElementById('downloadText');
   const spinner = document.getElementById('downloadSpinner');
   textEl.textContent = 'Downloading...';
@@ -1830,6 +1952,22 @@ async function downloadLivePhotoAsVideo() {
     btn.disabled = false; textEl.textContent = 'Video'; spinner.classList.add('hidden');
     _hideProgress();
   }
+=======
+  document.getElementById('downloadText').textContent = 'Downloading...';
+  document.getElementById('downloadSpinner').classList.remove('hidden');
+  try {
+    const res = await fetch('/api/download', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: currentUrl, type: 'video' }) });
+    if (!res.ok) { const d = await res.json(); throw new Error(d.detail); }
+    const blob = await res.blob();
+    let fn = 'video.mp4';
+    const disp = res.headers.get('Content-Disposition') || '';
+    const rfc = disp.match(/filename\*=(?:UTF-8|utf-8)''(.+?)(?:;|$)/i);
+    if (rfc) fn = decodeURIComponent(rfc[1]); else { const m = disp.match(/filename="?(.+?)"?$/); if (m) fn = m[1]; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fn;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(a.href);
+  } catch (e) { showToast(e.message || 'Failed', 'error'); }
+  finally { btn.disabled = false; document.getElementById('downloadSpinner').classList.add('hidden'); document.getElementById('downloadText').textContent = 'Video'; }
+>>>>>>> 30e4c2f26e62986a7a3b4d3de2e8e4497d49ece2
 }
 
 function formatSize(bytes) {
@@ -1844,6 +1982,7 @@ async function downloadVideo() {
   const btn = document.getElementById('downloadBtn'); btn.disabled = true;
   const textEl = document.getElementById('downloadText');
   const spinner = document.getElementById('downloadSpinner');
+<<<<<<< HEAD
   textEl.textContent = 'Downloading...';
   spinner.classList.remove('hidden');
   currentAbortController = new AbortController();
@@ -1860,6 +1999,64 @@ async function downloadVideo() {
     btn.disabled = false;
     spinner.classList.add('hidden');
     _hideProgress();
+=======
+  const progressWrap = document.getElementById('progressWrap');
+  const progressBar = document.getElementById('progressBar');
+  const progressText = document.getElementById('progressText');
+  textEl.textContent = 'Downloading...';
+  spinner.classList.remove('hidden');
+  progressWrap.classList.remove('hidden');
+  progressBar.style.width = '0%';
+  progressText.textContent = '';
+
+  try {
+    const resp = await fetch('/api/download', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: currentUrl, quality: currentQuality, type: currentType })
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || 'Download failed');
+    }
+
+    const contentLength = parseInt(resp.headers.get('Content-Length') || '0', 10);
+    const reader = resp.body.getReader();
+    const chunks = [];
+    let received = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      received += value.length;
+      if (contentLength > 0) {
+        const pct = Math.round((received / contentLength) * 100);
+        progressBar.style.width = pct + '%';
+        progressText.textContent = pct + '% · ' + formatSize(received) + ' / ' + formatSize(contentLength);
+      } else {
+        progressText.textContent = formatSize(received);
+      }
+    }
+
+    const blob = new Blob(chunks);
+    let fn = 'video.mp4';
+    const disp = resp.headers.get('Content-Disposition') || '';
+    const rfc = disp.match(/filename\*=(?:UTF-8|utf-8)''(.+?)(?:;|$)/i);
+    if (rfc) fn = decodeURIComponent(rfc[1]);
+    else { const m = disp.match(/filename="?(.+?)"?$/); if (m) fn = m[1]; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fn;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(a.href);
+    progressBar.style.width = '100%';
+    progressText.textContent = 'Done!';
+    updateLabel();
+  } catch (e) {
+    showToast(e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    spinner.classList.add('hidden');
+    setTimeout(() => { progressWrap.classList.add('hidden'); }, 3000);
+>>>>>>> 30e4c2f26e62986a7a3b4d3de2e8e4497d49ece2
   }
 }
 
