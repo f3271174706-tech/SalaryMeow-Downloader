@@ -77,6 +77,14 @@ npm-cache/
 # 配置文件（包含 Cookie，不提交）
 config.yaml
 
+# 部署文档（包含服务器敏感信息）
+docs/DEPLOY.md
+
+# SSH 密钥
+*.pem
+id_ed25519
+id_rsa
+
 # 数据文件
 data/*.jsonl
 =======
