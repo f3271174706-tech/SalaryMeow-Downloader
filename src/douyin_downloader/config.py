@@ -29,6 +29,23 @@ BASE_DIR = _find_project_root()
 
 # 默认配置（当 config.yaml 不存在时使用）
 DEFAULT_CONFIG = {
+    "app": {
+        "cors_origins": [
+            "https://fzpnowm.top",
+            "https://www.fzpnowm.top",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ],
+        "host": "0.0.0.0",
+        "port": 8001,
+        "reload": False,
+    },
+    "auth": {
+        "admin_user": "admin",
+        "admin_password": "",
+        "invite_code": "",
+        "secure_cookies": False,
+    },
     "network": {
         "timeout": 30,
         "connect_timeout": 10,

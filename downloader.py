@@ -6,7 +6,6 @@ import platform
 import re
 import subprocess
 import threading
-import urllib.request
 import time
 import uuid
 from pathlib import Path
@@ -35,10 +34,12 @@ def _playwright_launch_args() -> dict:
         return {"channel": "msedge"}
     return {"executable_path": "/snap/bin/chromium", "args": ["--no-sandbox"]}
 
+
 # 浏览器池 - 复用浏览器实例，避免每次启动
 _browser_pool = []
 _browser_lock = threading.Lock()
 _playwright_instance = None
+
 
 def _get_browser():
     """获取浏览器实例（复用池中的实例）"""
@@ -55,10 +56,12 @@ def _get_browser():
 
         # 需要创建新实例
         from playwright.sync_api import sync_playwright
+
         if _playwright_instance is None:
             _playwright_instance = sync_playwright().start()
         browser = _playwright_instance.chromium.launch(headless=True, **_playwright_launch_args())
         return browser, _playwright_instance
+
 
 def _return_browser(browser):
     """归还浏览器实例到池中"""
@@ -71,22 +74,33 @@ def _return_browser(browser):
         except Exception:
             pass
 
+
 DOWNLOADS_DIR = Path(__file__).parent / "downloads"
 
-# Auto-detect system proxy for httpx (used for Twitter/TikTok)
-_system_proxies = urllib.request.getproxies()
-PROXY_URL = _system_proxies.get("http") or _system_proxies.get("https")
-
-# Set proxy env vars so httpx picks them up automatically (works with all httpx versions)
-if PROXY_URL:
-    os.environ.setdefault("HTTP_PROXY", PROXY_URL)
-    os.environ.setdefault("HTTPS_PROXY", PROXY_URL)
+# An empty network.proxy means direct connections.
+PROXY_URL = config.get_proxy()
 
 # Monkey-patch httpx to always use proxy from env vars (for older httpx versions)
 _orig_get = httpx.get
 _orig_post = httpx.post
-def _get(*a, **kw): kw.setdefault("trust_env", True); return _orig_get(*a, **kw)
-def _post(*a, **kw): kw.setdefault("trust_env", True); return _orig_post(*a, **kw)
+
+
+def _get(*a, **kw):
+    if PROXY_URL:
+        kw.setdefault("proxy", PROXY_URL)
+    else:
+        kw.setdefault("trust_env", False)
+    return _orig_get(*a, **kw)
+
+
+def _post(*a, **kw):
+    if PROXY_URL:
+        kw.setdefault("proxy", PROXY_URL)
+    else:
+        kw.setdefault("trust_env", False)
+    return _orig_post(*a, **kw)
+
+
 httpx.get = _get
 httpx.post = _post
 
@@ -113,6 +127,7 @@ def _cache_set(key: str, info: dict):
         del _cache[oldest_key]
     info["_ts"] = time.time()
     _cache[key] = info
+
 
 # 共享线程池，避免反复创建
 _thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=8)
@@ -209,18 +224,18 @@ def _extract_images_with_playwright(share_url: str) -> tuple[list[str], list[str
     images = []
 
     # 从浏览器池获取实例
-    browser, pw = _get_browser()
+    browser, _pw = _get_browser()
     page = None
     try:
         page = browser.new_page()
-        page.goto(share_url, wait_until='domcontentloaded', timeout=15000)
+        page.goto(share_url, wait_until="domcontentloaded", timeout=15000)
 
         # Wait for images to stabilize (lazy-loaded), poll every 400ms, max 5s
         prev_count = 0
         stable_rounds = 0
         for _ in range(13):
             try:
-                count = page.evaluate('''() => {
+                count = page.evaluate("""() => {
                     let n = 0;
                     document.querySelectorAll('img').forEach(el => {
                         const src = el.src || '';
@@ -228,7 +243,7 @@ def _extract_images_with_playwright(share_url: str) -> tuple[list[str], list[str
                             !src.includes('100x100') && !src.includes('avatar')) n++;
                     });
                     return n;
-                }''')
+                }""")
             except Exception:
                 page.wait_for_timeout(400)
                 continue
@@ -246,20 +261,20 @@ def _extract_images_with_playwright(share_url: str) -> tuple[list[str], list[str
 
         # Wait for video elements to appear (they load after images)
         for _ in range(8):
-            has_video = page.evaluate('''() => {
+            has_video = page.evaluate("""() => {
                 let found = false;
                 document.querySelectorAll('video source').forEach(el => {
                     const src = el.src || el.getAttribute('src') || '';
                     if (src.includes('douyinvod')) found = true;
                 });
                 return found;
-            }''')
+            }""")
             if has_video:
                 break
             page.wait_for_timeout(400)
 
         # Batch extract via JS - container scoped + filters + dedup by ID
-        all_data = page.evaluate('''() => {
+        all_data = page.evaluate("""() => {
             const videos = [];
             const seenPaths = new Set();
             document.querySelectorAll('video source').forEach(el => {
@@ -295,9 +310,9 @@ def _extract_images_with_playwright(share_url: str) -> tuple[list[str], list[str
                 images.push(src);
             });
             return {videos, images};
-        }''')
-        video_urls = all_data.get('videos', [])
-        images = all_data.get('images', [])
+        }""")
+        video_urls = all_data.get("videos", [])
+        images = all_data.get("images", [])
 
         page.close()
         _return_browser(browser)
@@ -313,8 +328,6 @@ def _extract_images_with_playwright(share_url: str) -> tuple[list[str], list[str
         return [], []
 
     return video_urls, images
-
-
 
 
 def _extract_with_playwright_async(share_url: str) -> tuple[list[str], list[str]]:
@@ -333,14 +346,14 @@ def _extract_with_playwright_async(share_url: str) -> tuple[list[str], list[str]
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True, **_playwright_launch_args())
             page = await browser.new_page()
-            await page.goto(share_url, wait_until='domcontentloaded', timeout=15000)
+            await page.goto(share_url, wait_until="domcontentloaded", timeout=15000)
 
             # Wait for images to stabilize (lazy-loaded), poll every 400ms, max 5s
             prev_count = 0
             stable_rounds = 0
             for _ in range(13):  # 13 * 400ms = 5.2s max
                 try:
-                    count = await page.evaluate('''() => {
+                    count = await page.evaluate("""() => {
                         let n = 0;
                         document.querySelectorAll('img').forEach(el => {
                             const src = el.src || '';
@@ -348,7 +361,7 @@ def _extract_with_playwright_async(share_url: str) -> tuple[list[str], list[str]
                                 !src.includes('100x100') && !src.includes('avatar')) n++;
                         });
                         return n;
-                    }''')
+                    }""")
                 except Exception:
                     await page.wait_for_timeout(400)
                     continue
@@ -366,20 +379,20 @@ def _extract_with_playwright_async(share_url: str) -> tuple[list[str], list[str]
 
             # Wait for video elements to appear (they load after images)
             for _ in range(8):  # 8 * 400ms = 3.2s max
-                has_video = await page.evaluate('''() => {
+                has_video = await page.evaluate("""() => {
                     let found = false;
                     document.querySelectorAll('video source').forEach(el => {
                         const src = el.src || el.getAttribute('src') || '';
                         if (src.includes('douyinvod')) found = true;
                     });
                     return found;
-                }''')
+                }""")
                 if has_video:
                     break
                 await page.wait_for_timeout(400)
 
             # Batch extract via JS - container scoped + filters + dedup by ID
-            all_data = await page.evaluate(r'''() => {
+            all_data = await page.evaluate(r"""() => {
                 const videos = [];
                 const seenPaths = new Set();
                 document.querySelectorAll('video source').forEach(el => {
@@ -415,9 +428,9 @@ def _extract_with_playwright_async(share_url: str) -> tuple[list[str], list[str]
                     images.push(src);
                 });
                 return {videos, images};
-            }''')
-            video_urls = all_data.get('videos', [])
-            images = all_data.get('images', [])
+            }""")
+            video_urls = all_data.get("videos", [])
+            images = all_data.get("images", [])
 
             await browser.close()
 
@@ -436,7 +449,7 @@ def _safe_decode_json_str(raw: str) -> str:
     except json.JSONDecodeError:
         pass
     try:
-        return raw.encode('utf-8').decode('unicode_escape')
+        return raw.encode("utf-8").decode("unicode_escape")
     except (UnicodeDecodeError, UnicodeEncodeError):
         pass
     return raw
@@ -500,7 +513,7 @@ def _extract_douyin(url: str) -> dict:
                 raw = raw.replace("\\u002F", "/")
                 img_url = _safe_decode_json_str(raw)
                 # Only keep content images, skip music covers etc.
-                if 'tos-cn-i-' not in img_url:
+                if "tos-cn-i-" not in img_url:
                     continue
                 if img_url not in images:
                     images.append(img_url)
@@ -510,11 +523,12 @@ def _extract_douyin(url: str) -> dict:
         # Live photos have img_bitrate=null, pure photos have img_bitrate=[...]
         has_video_hint = '"img_bitrate":null' in html
         # Do NOT use len(images) <= 1 — single-image posts are valid and don't need Playwright
-        if (has_video_hint or len(images) == 0 or len(html) < 10000):
+        if has_video_hint or len(images) == 0 or len(html) < 10000:
             # 优先使用 API 模式解析动图（比 Playwright 快 3-7 倍）
             if has_video_hint and config.get("api.enabled", True):
                 try:
                     from douyin_api import _extract_douyin_api
+
                     logger.info(f"动图帖使用 API 模式: {share_url}")
                     # 在新线程中运行，避免 asyncio 事件循环冲突
                     future = _thread_pool.submit(asyncio.run, _extract_douyin_api(share_url))
@@ -541,8 +555,8 @@ def _extract_douyin(url: str) -> dict:
                         "duration": 0,
                         "type": "live_photo",
                         "video_url": pw_videos[0],  # Primary video
-                        "video_urls": pw_videos,     # All videos for multi-animated
-                        "images": images,             # Also include images
+                        "video_urls": pw_videos,  # All videos for multi-animated
+                        "images": images,  # Also include images
                         "music_url": music_url,
                         "platform": "douyin",
                     }
@@ -604,11 +618,16 @@ def _extract_douyin(url: str) -> dict:
 
 def _extract_tiktok(url: str) -> dict:
     """Extract TikTok video info via ssstiktok.cc (fast, no proxy needed)."""
-    import subprocess, tempfile
-    r = httpx.post("https://ssstiktok.cc/",
-                   data={"url": url, "mode": "video"},
-                   headers={"User-Agent": MOBILE_UA, "Referer": "https://ssstiktok.cc/"},
-                   follow_redirects=True, timeout=30)
+    import subprocess
+    import tempfile
+
+    r = httpx.post(
+        "https://ssstiktok.cc/",
+        data={"url": url, "mode": "video"},
+        headers={"User-Agent": MOBILE_UA, "Referer": "https://ssstiktok.cc/"},
+        follow_redirects=True,
+        timeout=30,
+    )
     if r.status_code != 200:
         raise ValueError(f"ssstiktok 返回 {r.status_code}")
 
@@ -620,8 +639,9 @@ def _extract_tiktok(url: str) -> dict:
     preview_path = preview_match.group(1)
 
     # Step 2: Get download link from preview page
-    r2 = httpx.get(f"https://ssstiktok.cc{preview_path}",
-                   headers={"User-Agent": MOBILE_UA}, follow_redirects=True, timeout=30)
+    r2 = httpx.get(
+        f"https://ssstiktok.cc{preview_path}", headers={"User-Agent": MOBILE_UA}, follow_redirects=True, timeout=30
+    )
     if r2.status_code != 200:
         raise ValueError(f"ssstiktok 预览页返回 {r2.status_code}")
 
@@ -633,7 +653,7 @@ def _extract_tiktok(url: str) -> dict:
     download_url = f"https://ssstiktok.cc{dl_match.group(1)}"
 
     # Extract title
-    title_match = re.search(r'<h2[^>]*>([^<]+)</h2>', r2.text)
+    title_match = re.search(r"<h2[^>]*>([^<]+)</h2>", r2.text)
     title = title_match.group(1).strip() if title_match else "tiktok_video"
 
     return {
@@ -667,8 +687,9 @@ def _parse_twitter_url(url: str) -> tuple[str, str]:
 def _curl_get(url: str, timeout: int = 30) -> str:
     """Use subprocess curl to bypass httpx proxy issues on cloud servers."""
     import subprocess
+
     cmd = ["curl", "-s", "-L", "--max-time", str(timeout), "-H", f"User-Agent: {MOBILE_UA}"]
-    proxy = os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY")
+    proxy = config.get_proxy()
     if proxy:
         cmd += ["--proxy", proxy]
     cmd.append(url)
@@ -681,10 +702,12 @@ def _curl_get(url: str, timeout: int = 30) -> str:
 def _curl_download(url: str, filepath: str, timeout: int = 120, headers: dict = None, use_proxy: bool = False) -> int:
     """Use subprocess curl to download a file. Returns file size."""
     import subprocess
+
     cmd = ["curl", "-s", "-L", "--max-time", str(timeout), "-o", filepath]
     if use_proxy:
-        proxy = os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY") or "http://127.0.0.1:7890"
-        cmd += ["--proxy", proxy]
+        proxy = config.get_proxy()
+        if proxy:
+            cmd += ["--proxy", proxy]
     if headers:
         for k, v in headers.items():
             cmd += ["-H", f"{k}: {v}"]
@@ -763,12 +786,12 @@ def _extract_bilibili(url: str) -> dict:
         url = str(r.url)
 
     # Extract BV ID (with or without BV prefix)
-    bv_match = re.search(r'(BV[\w]+)', url)
+    bv_match = re.search(r"(BV[\w]+)", url)
     if bv_match:
         bvid = bv_match.group(1)
     else:
         # Try /video/ID format (may be missing BV prefix)
-        id_match = re.search(r'/video/([\w]+)', url)
+        id_match = re.search(r"/video/([\w]+)", url)
         if id_match:
             raw_id = id_match.group(1)
             bvid = raw_id if raw_id.startswith("BV") else "BV" + raw_id
@@ -829,9 +852,9 @@ def _extract_kuaishou(url: str) -> dict:
     final_url = str(r.url)
 
     # Extract video ID from URL
-    vid_match = re.search(r'shareObjectId=([^&]+)', final_url)
+    vid_match = re.search(r"shareObjectId=([^&]+)", final_url)
     if not vid_match:
-        vid_match = re.search(r'/short-video/([^?]+)', final_url)
+        vid_match = re.search(r"/short-video/([^?]+)", final_url)
     if not vid_match:
         raise ValueError("无法从快手链接中提取视频 ID")
 
@@ -846,13 +869,13 @@ def _extract_kuaishou(url: str) -> dict:
     high_url = ""
     ultra_url = ""
     for u in mp4_urls:
-        if 'UltraV5' in u and not ultra_url:
+        if "UltraV5" in u and not ultra_url:
             ultra_url = u
-        elif 'HighV5' in u and not high_url:
+        elif "HighV5" in u and not high_url:
             high_url = u
 
     fallback = mp4_urls[0]
-    video_url = high_url or fallback        # H.264 for browser preview
+    video_url = high_url or fallback  # H.264 for browser preview
     hd_url = ultra_url or high_url or fallback  # highest for download
 
     # Extract title
@@ -872,8 +895,8 @@ def _extract_kuaishou(url: str) -> dict:
         "thumbnail": thumbnail,
         "duration": 0,
         "type": "video",
-        "video_url": video_url,   # High (H.264) for preview
-        "hd_url": hd_url,         # Ultra for download
+        "video_url": video_url,  # High (H.264) for preview
+        "hd_url": hd_url,  # Ultra for download
         "platform": "kuaishou",
     }
 
@@ -920,21 +943,22 @@ def extract_video_info(url: str) -> dict:
     if config.get("api.enabled", True) and platform == "douyin":
         try:
             from douyin_api import _extract_douyin_api
+
             logger.info(f"尝试使用 API 模式: {platform}")
             future = _thread_pool.submit(asyncio.run, _extract_douyin_api(url))
             info = future.result(timeout=15)
             if info:
                 logger.info(f"API 提取成功: {info.get('title', '')[:30]}...")
             else:
-                logger.warning(f"API 返回 None，切换 Cookie 重试")
+                logger.warning("API 返回 None，切换 Cookie 重试")
                 # 切换 Cookie 重试一次
                 config.rotate_cookie(platform)
                 future = _thread_pool.submit(asyncio.run, _extract_douyin_api(url))
                 info = future.result(timeout=15)
                 if info:
-                    logger.info(f"Cookie 切换后 API 提取成功")
+                    logger.info("Cookie 切换后 API 提取成功")
                 else:
-                    logger.warning(f"Cookie 切换后仍失败，回退到爬虫")
+                    logger.warning("Cookie 切换后仍失败，回退到爬虫")
         except Exception as e:
             logger.warning(f"API 提取失败，回退到爬虫: {e}")
     # TikTok 直接用爬虫（TikTokApi 在服务器上不稳定）
@@ -955,7 +979,9 @@ def extract_video_info(url: str) -> dict:
 
     # 记录解析结果（用于管理后台）
     if info:
-        logger.info(f"解析完成: url={url}, platform={platform}, type={info.get('type', 'unknown')}, title={info.get('title', '')[:50]}")
+        logger.info(
+            f"解析完成: url={url}, platform={platform}, type={info.get('type', 'unknown')}, title={info.get('title', '')[:50]}"
+        )
 
     _cache_set(url, info)
     return {k: v for k, v in info.items() if not k.startswith("_")}
@@ -1002,12 +1028,29 @@ def _make_slides_video(info: dict) -> str:
             f.write(r.content)
         vid_path = str(DOWNLOADS_DIR / f"_slide_v_{i}_{uuid.uuid4().hex[:4]}.mp4")
         subprocess.run(
-            ["ffmpeg", "-y", "-loop", "1", "-i", img_tmp,
-             "-c:v", "libx264", "-t", f"{image_duration:.2f}",
-             "-pix_fmt", "yuv420p", "-preset", "ultrafast", "-crf", "23",
-             "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2",
-             vid_path],
-            capture_output=True, check=True,
+            [
+                "ffmpeg",
+                "-y",
+                "-loop",
+                "1",
+                "-i",
+                img_tmp,
+                "-c:v",
+                "libx264",
+                "-t",
+                f"{image_duration:.2f}",
+                "-pix_fmt",
+                "yuv420p",
+                "-preset",
+                "ultrafast",
+                "-crf",
+                "23",
+                "-vf",
+                "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2",
+                vid_path,
+            ],
+            capture_output=True,
+            check=True,
         )
         os.remove(img_tmp)
         vid_paths.append(vid_path)
@@ -1018,7 +1061,7 @@ def _make_slides_video(info: dict) -> str:
         for v in vid_paths:
             f.write(f"file '{v}'\n")
 
-    safe_name = re.sub(r'[\n\r\t\\/*?:"<>|#]', '', info["title"])[:50] or uuid.uuid4().hex[:12]
+    safe_name = re.sub(r'[\n\r\t\\/*?:"<>|#]', "", info["title"])[:50] or uuid.uuid4().hex[:12]
     out_path = str(DOWNLOADS_DIR / f"{safe_name}.mp4")
     cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_file]
     if music_path:
@@ -1033,21 +1076,26 @@ def _make_slides_video(info: dict) -> str:
 
     # Cleanup temp files
     for p in vid_paths:
-        try: os.remove(p)
-        except OSError: pass
+        try:
+            os.remove(p)
+        except OSError:
+            pass
     if music_path:
-        try: os.remove(music_path)
-        except OSError: pass
-    try: os.remove(concat_file)
-    except OSError: pass
+        try:
+            os.remove(music_path)
+        except OSError:
+            pass
+    try:
+        os.remove(concat_file)
+    except OSError:
+        pass
 
     _schedule_cleanup(out_path)
     return out_path
 
 
 def download_video(
-    url: str, quality: str = "1080p", media_type: str = "video", image_index: int = 0,
-    live_photo_format: bool = False
+    url: str, quality: str = "1080p", media_type: str = "video", image_index: int = 0, live_photo_format: bool = False
 ) -> tuple[str, str]:
     """
     Download video/image or extract audio. Returns (file_path, filename).
@@ -1073,7 +1121,7 @@ def download_video(
             elif media_type == "mp3" and info.get("music_url"):
                 # Download music directly
                 r = httpx.get(info["music_url"], headers={"User-Agent": MOBILE_UA}, follow_redirects=True, timeout=60)
-                safe_title = re.sub(r'[\n\r\t\\/*?:"<>|#]', '', info["title"])[:50]
+                safe_title = re.sub(r'[\n\r\t\\/*?:"<>|#]', "", info["title"])[:50]
                 filename = f"{safe_title}.mp3" if safe_title else f"{uuid.uuid4().hex[:12]}.mp3"
                 filepath = str(DOWNLOADS_DIR / filename)
                 with open(filepath, "wb") as f:
@@ -1121,7 +1169,7 @@ def download_video(
                     except OSError:
                         pass
 
-                    safe_title = re.sub(r'[\n\r\t\\/*?:"<>|#]', '', info["title"])[:50] or uuid.uuid4().hex[:12]
+                    safe_title = re.sub(r'[\n\r\t\\/*?:"<>|#]', "", info["title"])[:50] or uuid.uuid4().hex[:12]
                     _schedule_cleanup(vid_out)
                     return vid_out, f"{safe_title}_live_photo.mov"
                 else:
@@ -1164,22 +1212,32 @@ def _download_douyin_video(info: dict, quality: str = "1080p") -> tuple[str, str
 
     video_url = apply_quality(video_url, quality)
 
-    safe_title = re.sub(r'[\n\r\t\\/*?:"<>|#]', '', info["title"])[:50]
+    safe_title = re.sub(r'[\n\r\t\\/*?:"<>|#]', "", info["title"])[:50]
     filename = f"{safe_title}.mp4" if safe_title else f"{uuid.uuid4().hex[:12]}.mp4"
     filepath = str(DOWNLOADS_DIR / filename)
 
     headers = {"User-Agent": MOBILE_UA, "Referer": "https://www.iesdouyin.com/"}
 
     # Streaming download - write to disk in chunks (safe for large files)
-    with httpx.stream("GET", video_url, headers=headers, follow_redirects=True,
-                       timeout=httpx.Timeout(connect=10, read=300, write=10, pool=10)) as r:
+    with httpx.stream(
+        "GET",
+        video_url,
+        headers=headers,
+        follow_redirects=True,
+        timeout=httpx.Timeout(connect=10, read=300, write=10, pool=10),
+    ) as r:
         # If play URL returns empty, try direct CDN URI
         if int(r.headers.get("content-length", 0)) == 0 and "aweme.snssdk.com" in video_url:
-            vid_match = re.search(r'video_id=([^&]+)', video_url)
+            vid_match = re.search(r"video_id=([^&]+)", video_url)
             if vid_match:
                 direct_url = vid_match.group(1)
-                with httpx.stream("GET", direct_url, headers={"User-Agent": MOBILE_UA},
-                                   follow_redirects=True, timeout=httpx.Timeout(connect=10, read=300, write=10, pool=10)) as r2:
+                with httpx.stream(
+                    "GET",
+                    direct_url,
+                    headers={"User-Agent": MOBILE_UA},
+                    follow_redirects=True,
+                    timeout=httpx.Timeout(connect=10, read=300, write=10, pool=10),
+                ) as r2:
                     with open(filepath, "wb") as f:
                         for chunk in r2.iter_bytes(65536):
                             f.write(chunk)
@@ -1197,11 +1255,12 @@ def _download_douyin_video(info: dict, quality: str = "1080p") -> tuple[str, str
 def _download_live_photos(info: dict) -> tuple[str, str]:
     """Download and merge multiple live photos (animated images) into one video."""
     import concurrent.futures
+
     video_urls = info.get("video_urls", [])
     if not video_urls:
         raise ValueError("未找到动图视频")
 
-    safe_title = re.sub(r'[\n\r\t\\/*?:"<>|#]', '', info["title"])[:50] or uuid.uuid4().hex[:12]
+    safe_title = re.sub(r'[\n\r\t\\/*?:"<>|#]', "", info["title"])[:50] or uuid.uuid4().hex[:12]
     headers = {"User-Agent": MOBILE_UA, "Referer": "https://www.douyin.com/"}
 
     # 并行下载视频片段
@@ -1209,7 +1268,7 @@ def _download_live_photos(info: dict) -> tuple[str, str]:
         i, url = i_url
         try:
             r = httpx.get(url, headers=headers, follow_redirects=True, timeout=120)
-            if len(r.content) < 1000 or r.content[:1] == b'<':
+            if len(r.content) < 1000 or r.content[:1] == b"<":
                 return None
             vid_path = str(DOWNLOADS_DIR / f"_live_{i}_{uuid.uuid4().hex[:4]}.mp4")
             with open(vid_path, "wb") as f:
@@ -1239,9 +1298,26 @@ def _download_live_photos(info: dict) -> tuple[str, str]:
     out_path = str(DOWNLOADS_DIR / f"{safe_title}.mp4")
     # Re-encode to ensure compatible format (clips may differ in codec/resolution/fps)
     cmd = [
-        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_file,
-        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-        "-pix_fmt", "yuv420p", "-c:a", "aac", "-movflags", "+faststart",
+        "ffmpeg",
+        "-y",
+        "-f",
+        "concat",
+        "-safe",
+        "0",
+        "-i",
+        concat_file,
+        "-c:v",
+        "libx264",
+        "-preset",
+        "fast",
+        "-crf",
+        "23",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-movflags",
+        "+faststart",
         out_path,
     ]
     result = subprocess.run(cmd, capture_output=True)
@@ -1291,32 +1367,44 @@ def _convert_to_live_photo(image_path: str, video_path: str) -> tuple[str, str]:
     # 1. 处理图片 - 转换为 JPEG 格式
     try:
         from PIL import Image
+
         img = Image.open(image_path)
         # 转换为 RGB 模式（如果是 RGBA 等）
-        if img.mode != 'RGB':
-            img = img.convert('RGB')
+        if img.mode != "RGB":
+            img = img.convert("RGB")
         img.save(output_image, "JPEG", quality=95)
     except ImportError:
         # 如果没有 Pillow，直接复制文件
         import shutil
+
         shutil.copy2(image_path, output_image)
     except Exception as e:
         logger.warning(f"图片转换失败: {e}")
         import shutil
+
         shutil.copy2(image_path, output_image)
 
     # 2. 处理视频 - 转换为 MOV 格式并添加 ContentIdentifier
     cmd = [
-        "ffmpeg", "-y",
-        "-i", video_path,
-        "-c:v", "libx264",
-        "-preset", "fast",
-        "-crf", "23",
-        "-pix_fmt", "yuv420p",
-        "-r", "24",  # 24fps
-        "-movflags", "+faststart+use_metadata_tags",
-        "-metadata:s:v", f"ContentIdentifier={content_id}",
-        output_video
+        "ffmpeg",
+        "-y",
+        "-i",
+        video_path,
+        "-c:v",
+        "libx264",
+        "-preset",
+        "fast",
+        "-crf",
+        "23",
+        "-pix_fmt",
+        "yuv420p",
+        "-r",
+        "24",  # 24fps
+        "-movflags",
+        "+faststart+use_metadata_tags",
+        "-metadata:s:v",
+        f"ContentIdentifier={content_id}",
+        output_video,
     ]
     result = subprocess.run(cmd, capture_output=True)
     if result.returncode != 0:
@@ -1325,23 +1413,22 @@ def _convert_to_live_photo(image_path: str, video_path: str) -> tuple[str, str]:
 
     # 3. 给图片添加 ContentIdentifier（通过 exiftool 或 ffmpeg）
     try:
-        cmd_exiftool = [
-            "exiftool",
-            "-overwrite_original",
-            f"-ContentIdentifier={content_id}",
-            output_image
-        ]
+        cmd_exiftool = ["exiftool", "-overwrite_original", f"-ContentIdentifier={content_id}", output_image]
         result = subprocess.run(cmd_exiftool, capture_output=True)
         if result.returncode != 0:
             raise RuntimeError("exiftool failed")
     except (FileNotFoundError, RuntimeError):
         temp_img = str(DOWNLOADS_DIR / f"_temp_{uuid.uuid4().hex[:4]}.jpg")
         cmd_img = [
-            "ffmpeg", "-y",
-            "-i", output_image,
-            "-movflags", "+use_metadata_tags",
-            "-metadata:s:v", f"ContentIdentifier={content_id}",
-            temp_img
+            "ffmpeg",
+            "-y",
+            "-i",
+            output_image,
+            "-movflags",
+            "+use_metadata_tags",
+            "-metadata:s:v",
+            f"ContentIdentifier={content_id}",
+            temp_img,
         ]
         result = subprocess.run(cmd_img, capture_output=True)
         if result.returncode == 0 and os.path.exists(temp_img):
@@ -1367,7 +1454,7 @@ def _download_twitter_video(url: str) -> tuple[str, str]:
     if not video_url and not m3u8_url:
         raise ValueError("未能提取视频下载地址")
 
-    safe_title = re.sub(r'[\n\r\t\\/*?:"<>|#]', '', info["title"])[:50]
+    safe_title = re.sub(r'[\n\r\t\\/*?:"<>|#]', "", info["title"])[:50]
     filename = f"{safe_title}.mp4" if safe_title else f"{uuid.uuid4().hex[:12]}.mp4"
     filepath = str(DOWNLOADS_DIR / filename)
 
@@ -1385,6 +1472,7 @@ def _download_twitter_video(url: str) -> tuple[str, str]:
     # Fall back to m3u8/ffmpeg (for cloud servers where video.twimg.com is blocked)
     if not downloaded and m3u8_url and ".m3u8" in m3u8_url:
         import subprocess
+
         # Rewrite master m3u8 to specific stream URL (pick highest bitrate)
         if "/pl/" in m3u8_url and "/pl/avc1/" not in m3u8_url:
             m3u8_text = _curl_get(m3u8_url, timeout=15)
@@ -1400,7 +1488,7 @@ def _download_twitter_video(url: str) -> tuple[str, str]:
                     base_url = m3u8_url.rsplit("/", 1)[0]
                     m3u8_url = base_url + "/" + stream_match
 
-        proxy = os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY")
+        proxy = config.get_proxy()
         cmd = ["ffmpeg", "-y"]
         if proxy:
             cmd += ["-http_proxy", proxy]
@@ -1450,8 +1538,8 @@ def _download_single_photo(info: dict, index: int = 0) -> tuple[str, str]:
         else:
             ext = ".webp"
 
-    safe_title = re.sub(r'[\n\r\t\\/*?:"<>|#]', '', info["title"])[:50]
-    filename = f"{safe_title}_{idx+1}{ext}" if safe_title else f"{uuid.uuid4().hex[:12]}{ext}"
+    safe_title = re.sub(r'[\n\r\t\\/*?:"<>|#]', "", info["title"])[:50]
+    filename = f"{safe_title}_{idx + 1}{ext}" if safe_title else f"{uuid.uuid4().hex[:12]}{ext}"
     filepath = str(DOWNLOADS_DIR / filename)
 
     with open(filepath, "wb") as f:
@@ -1461,15 +1549,15 @@ def _download_single_photo(info: dict, index: int = 0) -> tuple[str, str]:
     return filepath, filename
 
 
-
 def _download_all_photos(info: dict) -> list[tuple[str, str]]:
     """并行下载所有图片，返回所有文件路径"""
     import concurrent.futures
+
     images = info.get("images", [])
     if not images:
         raise ValueError("未能提取图片地址")
 
-    safe_title = re.sub(r'[\n\r\t\\/*?:"<>|#]', '', info["title"])[:50] or uuid.uuid4().hex[:12]
+    safe_title = re.sub(r'[\n\r\t\\/*?:"<>|#]', "", info["title"])[:50] or uuid.uuid4().hex[:12]
     headers = {"User-Agent": MOBILE_UA, "Referer": "https://www.iesdouyin.com/"}
 
     def download_single(i_url):
@@ -1485,7 +1573,7 @@ def _download_all_photos(info: dict) -> list[tuple[str, str]]:
                 ext = ".gif"
             else:
                 ext = ".webp"
-            filename = f"{safe_title}_{i+1}{ext}"
+            filename = f"{safe_title}_{i + 1}{ext}"
             filepath = str(DOWNLOADS_DIR / filename)
             with open(filepath, "wb") as f:
                 f.write(r.content)
@@ -1514,7 +1602,7 @@ def _download_tiktok(url: str) -> tuple[str, str]:
 
     r = httpx.get(video_url, headers={"User-Agent": MOBILE_UA}, follow_redirects=True, timeout=120)
 
-    safe_title = re.sub(r'[\n\r\t\\/*?:"<>|#]', '', info["title"])[:50]
+    safe_title = re.sub(r'[\n\r\t\\/*?:"<>|#]', "", info["title"])[:50]
     filename = f"{safe_title}.mp4" if safe_title else f"{uuid.uuid4().hex[:12]}.mp4"
     filepath = str(DOWNLOADS_DIR / filename)
 
@@ -1534,7 +1622,7 @@ def _download_kuaishou_video(url: str) -> tuple[str, str]:
 
     r = httpx.get(video_url, headers={"User-Agent": MOBILE_UA}, follow_redirects=True, timeout=120, verify=False)
 
-    safe_title = re.sub(r'[\n\r\t\\/*?:"<>|#]', '', info["title"])[:50]
+    safe_title = re.sub(r'[\n\r\t\\/*?:"<>|#]', "", info["title"])[:50]
     filename = f"{safe_title}.mp4" if safe_title else f"{uuid.uuid4().hex[:12]}.mp4"
     filepath = str(DOWNLOADS_DIR / filename)
 
@@ -1555,7 +1643,7 @@ def _download_bilibili_video(url: str) -> tuple[str, str]:
     headers = {"User-Agent": MOBILE_UA, "Referer": "https://www.bilibili.com/"}
     r = httpx.get(video_url, headers=headers, follow_redirects=True, timeout=120)
 
-    safe_title = re.sub(r'[\n\r\t\\/*?:"<>|#]', '', info["title"])[:50]
+    safe_title = re.sub(r'[\n\r\t\\/*?:"<>|#]', "", info["title"])[:50]
     filename = f"{safe_title}.mp4" if safe_title else f"{uuid.uuid4().hex[:12]}.mp4"
     filepath = str(DOWNLOADS_DIR / filename)
 
@@ -1587,6 +1675,7 @@ def download_video_for_stream(video_url: str, m3u8_url: str = "") -> tuple[str, 
     # Fall back to m3u8/ffmpeg for Twitter (cloud servers where video.twimg.com is blocked)
     if not downloaded and m3u8_url and ".m3u8" in m3u8_url:
         import subprocess
+
         # Rewrite master m3u8 to specific stream URL (pick highest bitrate)
         if "/pl/" in m3u8_url and "/pl/avc1/" not in m3u8_url:
             m3u8_text = _curl_get(m3u8_url, timeout=15)
@@ -1601,7 +1690,7 @@ def download_video_for_stream(video_url: str, m3u8_url: str = "") -> tuple[str, 
                     base_url = m3u8_url.rsplit("/", 1)[0]
                     m3u8_url = base_url + "/" + stream_match
 
-        proxy = os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY")
+        proxy = config.get_proxy()
         cmd = ["ffmpeg", "-y"]
         if proxy:
             cmd += ["-http_proxy", proxy]
@@ -1638,8 +1727,10 @@ def download_video_for_stream(video_url: str, m3u8_url: str = "") -> tuple[str, 
 
 def _schedule_cleanup(filepath: str):
     """Delete file after 10 minutes."""
+
     def _cleanup():
         import time
+
         time.sleep(600)
         try:
             if os.path.exists(filepath):

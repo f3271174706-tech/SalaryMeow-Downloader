@@ -52,5 +52,5 @@ run:  ## 运行开发服务器
 setup:  ## 初始化项目（创建 venv + 安装依赖）
 	python -m venv .venv
 	@echo "虚拟环境已创建，请激活："
-	@echo "  Windows: .venv\\Scripts\\activate"
+	@echo "  Windows PowerShell: .\\.venv\\Scripts\\Activate.ps1"
 	@echo "  Linux/macOS: source .venv/bin/activate"

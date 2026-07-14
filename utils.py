@@ -165,7 +165,7 @@ def curl_get(url: str, timeout: int = 30, headers: Optional[Dict] = None) -> str
 
     except subprocess.TimeoutExpired:
         logger.error(f"curl 超时: {url}")
-        raise RequestError(f"curl 超时", url=url)
+        raise RequestError("curl 超时", url=url)
 
 
 def curl_download(
@@ -212,13 +212,14 @@ def curl_download(
             raise RequestError(f"curl download failed: {error_msg}", url=url)
 
         import os
+
         file_size = os.path.getsize(filepath)
         logger.debug(f"curl 下载完成: {file_size} bytes")
         return file_size
 
     except subprocess.TimeoutExpired:
         logger.error(f"curl 下载超时: {url}")
-        raise RequestError(f"curl 下载超时", url=url)
+        raise RequestError("curl 下载超时", url=url)
 
 
 def detect_platform(url: str) -> Optional[str]:

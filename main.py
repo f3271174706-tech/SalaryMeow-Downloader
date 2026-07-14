@@ -1,7 +1,7 @@
-from pathlib import Path
-from urllib.parse import unquote, urlparse
 import ipaddress
 import re
+from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 import httpx
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -9,30 +9,60 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from starlette.responses import Response
 from pydantic import BaseModel
+from starlette.responses import Response
 
-from downloader import MOBILE_UA, apply_quality, cleanup_old_files, download_video_for_stream, extract_video_info, download_video
+from config import config
+from downloader import (
+    MOBILE_UA,
+    apply_quality,
+    cleanup_old_files,
+    download_video,
+    download_video_for_stream,
+    extract_video_info,
+)
 
 # SSRF 防护：允许的域名白名单
 ALLOWED_DOMAINS = {
     # 抖音
-    "douyin.com", "douyinpic.com", "douyinvod.com", "douyincdn.com",
-    "iesdouyin.com", "snssdk.com", "bytecdn.cn", "bytedance.com",
-    "zjcdn.com", "bdstatic.com", "pstatp.com",
+    "douyin.com",
+    "douyinpic.com",
+    "douyinvod.com",
+    "douyincdn.com",
+    "iesdouyin.com",
+    "snssdk.com",
+    "bytecdn.cn",
+    "bytedance.com",
+    "zjcdn.com",
+    "bdstatic.com",
+    "pstatp.com",
     # Twitter/X
-    "twitter.com", "x.com", "t.co", "twimg.com", "twttr.com",
-    "pscp.tv", "tweetdeck.com",
+    "twitter.com",
+    "x.com",
+    "t.co",
+    "twimg.com",
+    "twttr.com",
+    "pscp.tv",
+    "tweetdeck.com",
     # TikTok
-    "tiktok.com", "tiktokv.com", "ttwstatic.com", "tiktokcdn.com",
+    "tiktok.com",
+    "tiktokv.com",
+    "ttwstatic.com",
+    "tiktokcdn.com",
     # B站
-    "bilibili.com", "bilivideo.com", "hdslb.com", "bilivideo.cn",
+    "bilibili.com",
+    "bilivideo.com",
+    "hdslb.com",
+    "bilivideo.cn",
     # 快手
-    "kuaishou.com", "gifshow.com",
+    "kuaishou.com",
+    "gifshow.com",
     # 通用 CDN
-    "sf11-cdn-tos.douyinstatic.com", "sf6-cdn-tos.douyinstatic.com",
+    "sf11-cdn-tos.douyinstatic.com",
+    "sf6-cdn-tos.douyinstatic.com",
     # TikTok 下载
-    "ssstiktok.cc", "snaptik.app",
+    "ssstiktok.cc",
+    "snaptik.app",
 }
 
 
@@ -57,15 +87,22 @@ def _validate_url(url: str) -> bool:
     except Exception:
         return False
 
-app = FastAPI(title="抖音/X 无水印下载器")
+
+app = FastAPI(title="SalaryMeow Downloader")
+
 
 @app.on_event("startup")
 async def startup_cleanup():
     cleanup_old_files()
 
+
+cors_origins = config.get("app.cors_origins", ["*"])
+if isinstance(cors_origins, str):
+    cors_origins = [cors_origins]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -80,15 +117,16 @@ static_dir.mkdir(exist_ok=True)
 
 class CachedStaticFiles(StaticFiles):
     """Static files with Cache-Control headers for better performance."""
+
     async def get_response(self, path: str, scope):
         response = await super().get_response(path, scope)
         if response.status_code == 200 and isinstance(response, Response):
             # JS/CSS/图片：缓存 7 天
-            if path.endswith(('.js', '.css', '.jpg', '.png', '.webp', '.gif', '.ico')):
-                response.headers['Cache-Control'] = 'public, max-age=604800, immutable'
+            if path.endswith((".js", ".css", ".jpg", ".png", ".webp", ".gif", ".ico")):
+                response.headers["Cache-Control"] = "public, max-age=604800, immutable"
             # HTML：缓存 10 分钟（方便更新）
-            elif path.endswith('.html'):
-                response.headers['Cache-Control'] = 'public, max-age=600'
+            elif path.endswith(".html"):
+                response.headers["Cache-Control"] = "public, max-age=600"
         return response
 
 
@@ -110,6 +148,7 @@ class DownloadRequest(BaseModel):
 @app.get("/")
 async def index():
     from fastapi.responses import HTMLResponse
+
     html_path = static_dir / "index.html"
     if html_path.exists():
         return HTMLResponse(html_path.read_text(encoding="utf-8"), headers={"Cache-Control": "public, max-age=600"})
@@ -119,6 +158,7 @@ async def index():
 @app.get("/v1")
 async def index_v1():
     from fastapi.responses import HTMLResponse
+
     html_path = static_dir / "index-v1.html"
     if html_path.exists():
         return HTMLResponse(html_path.read_text(encoding="utf-8"), headers={"Cache-Control": "public, max-age=600"})
@@ -128,18 +168,26 @@ async def index_v1():
 @app.get("/v2")
 async def index_v2():
     from fastapi.responses import HTMLResponse
+
     html_path = static_dir / "index-v2.html"
     if html_path.exists():
         return HTMLResponse(html_path.read_text(encoding="utf-8"), headers={"Cache-Control": "public, max-age=600"})
     return HTMLResponse("<h1>index-v2.html not found</h1>", status_code=404)
 
 
-LOGS_DIR = Path("/root/DOWN/logs")
+_configured_log_file = Path(config.get("logging.file", "logs/downloader.log"))
+LOGS_DIR = (
+    _configured_log_file.parent
+    if _configured_log_file.is_absolute()
+    else Path(__file__).parent / _configured_log_file.parent
+)
+
 
 def log_parse_record(url: str, platform: str, media_type: str, title: str):
     """记录解析记录到日志文件"""
     import datetime
     import json
+
     LOGS_DIR.mkdir(exist_ok=True)
     log_file = LOGS_DIR / "parse_records.jsonl"
 
@@ -148,7 +196,7 @@ def log_parse_record(url: str, platform: str, media_type: str, title: str):
         "url": url,
         "platform": platform,
         "type": media_type,
-        "title": title[:100]
+        "title": title[:100],
     }
 
     try:
@@ -560,6 +608,7 @@ setInterval(loadRecords, 30000);
 </body>
 </html>"""
     from fastapi.responses import HTMLResponse
+
     return HTMLResponse(html)
 
 
@@ -572,7 +621,7 @@ def get_parse_records(platform: str = "", type: str = "", limit: int = 500):
 
     records = []
     try:
-        with open(log_file, "r", encoding="utf-8") as f:
+        with open(log_file, encoding="utf-8") as f:
             for line in f:
                 # 解析 "解析完成" 日志行
                 if "解析完成:" in line:
@@ -580,26 +629,28 @@ def get_parse_records(platform: str = "", type: str = "", limit: int = 500):
                         # 提取时间戳
                         timestamp = line[:19].strip()
                         # 提取 URL
-                        url_match = re.search(r'url=(https?://[^\s,]+)', line)
+                        url_match = re.search(r"url=(https?://[^\s,]+)", line)
                         url_val = url_match.group(1) if url_match else ""
                         # 提取平台
-                        platform_match = re.search(r'platform=(\w+)', line)
+                        platform_match = re.search(r"platform=(\w+)", line)
                         platform_val = platform_match.group(1) if platform_match else "unknown"
                         # 提取类型
-                        type_match = re.search(r'type=(\w+)', line)
+                        type_match = re.search(r"type=(\w+)", line)
                         type_val = type_match.group(1) if type_match else "unknown"
                         # 提取标题
-                        title_match = re.search(r'title=(.+?)(?:\s*$)', line)
+                        title_match = re.search(r"title=(.+?)(?:\s*$)", line)
                         title = title_match.group(1).strip() if title_match else ""
 
-                        records.append({
-                            "timestamp": timestamp,
-                            "url": url_val,
-                            "platform": platform_val,
-                            "type": type_val,
-                            "title": title
-                        })
-                    except:
+                        records.append(
+                            {
+                                "timestamp": timestamp,
+                                "url": url_val,
+                                "platform": platform_val,
+                                "type": type_val,
+                                "title": title,
+                            }
+                        )
+                    except Exception:
                         continue
     except Exception as e:
         return []
@@ -624,7 +675,7 @@ def parse_video(req: ParseRequest):
     try:
         info = extract_video_info(url)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"解析失败: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"解析失败: {e!s}")
 
     media_type = info.get("type", "video")
     platform = info.get("platform", "unknown")
@@ -703,11 +754,10 @@ async def stream_video(
 
     try:
         # 不用 async with，手动管理生命周期，避免 StreamingResponse 迭代前连接被关
-        # 国外 CDN 需要代理
-        is_foreign = any(d in video_url for d in ["video.twimg.com", "tiktokcdn", "tiktokv.com", "ttwstatic.com"])
         client_kwargs = {"follow_redirects": True, "timeout": httpx.Timeout(connect=10, read=300, write=10, pool=10)}
-        if is_foreign:
-            client_kwargs["proxy"] = "http://127.0.0.1:7890"
+        proxy = config.get_proxy()
+        if proxy:
+            client_kwargs["proxy"] = proxy
         else:
             client_kwargs["trust_env"] = False
         client = httpx.AsyncClient(**client_kwargs)
@@ -718,7 +768,7 @@ async def stream_video(
         content_length = int(stream_resp.headers.get("content-length", 0))
         if content_length == 0 and "aweme.snssdk.com" in video_url:
             await stream_resp.aclose()
-            vid_match = re.search(r'video_id=([^&]+)', video_url)
+            vid_match = re.search(r"video_id=([^&]+)", video_url)
             if vid_match:
                 direct_url = vid_match.group(1)
                 req = client.build_request("GET", direct_url, headers={"User-Agent": MOBILE_UA})
@@ -754,7 +804,7 @@ async def stream_video(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"流式连接失败: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"流式连接失败: {e!s}")
 
 
 @app.post("/api/download")
@@ -768,11 +818,14 @@ def download_video_api(req: DownloadRequest):
 
     try:
         file_path, filename = download_video(
-            url, quality=req.quality, media_type=req.type, image_index=req.image_index,
-            live_photo_format=req.live_photo_format
+            url,
+            quality=req.quality,
+            media_type=req.type,
+            image_index=req.image_index,
+            live_photo_format=req.live_photo_format,
         )
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"下载失败: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"下载失败: {e!s}")
 
     if filename.endswith(".mp3"):
         media_type = "audio/mpeg"

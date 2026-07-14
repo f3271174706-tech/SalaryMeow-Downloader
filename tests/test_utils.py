@@ -1,7 +1,8 @@
 """工具函数测试"""
 
 import pytest
-from douyin_downloader.utils import detect_platform, extract_url, RequestError
+
+from douyin_downloader.utils import RequestError, detect_platform, extract_url
 
 
 class TestDetectPlatform:

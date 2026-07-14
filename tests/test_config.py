@@ -1,6 +1,7 @@
 """配置模块测试"""
 
 import pytest
+
 from douyin_downloader.config import Config, _deep_merge
 
 

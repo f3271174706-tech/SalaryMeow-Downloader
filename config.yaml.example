@@ -1,0 +1,55 @@
+# Copy this file to config.yaml. Keep config.yaml private.
+app:
+  cors_origins:
+    - "https://fzpnowm.top"
+    - "https://www.fzpnowm.top"
+    - "http://localhost:3000"
+    - "http://127.0.0.1:3000"
+  host: "0.0.0.0"
+  port: 8001
+  reload: false
+
+auth:
+  admin_user: "admin"
+  admin_password: ""
+  invite_code: ""
+  secure_cookies: false
+
+network:
+  timeout: 30
+  connect_timeout: 10
+  read_timeout: 300
+  proxy: ""
+  max_retries: 3
+  retry_delay_base: 1
+
+cookies:
+  douyin: ""
+  tiktok: ""
+  bilibili: ""
+  twitter: ""
+  kuaishou: ""
+
+download:
+  directory: "downloads"
+  cleanup_delay: 600
+  startup_cleanup_age: 1800
+  chunk_size: 65536
+
+cache:
+  enabled: true
+  ttl: 600
+
+logging:
+  level: "INFO"
+  file: "logs/downloader.log"
+  max_size: 10
+  backup_count: 5
+  format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+
+platforms:
+  douyin:
+    enable_playwright: true
+    playwright_timeout: 15000
+  tiktok:
+    parser_url: "https://ssstiktok.cc/"

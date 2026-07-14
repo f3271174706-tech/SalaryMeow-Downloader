@@ -4,7 +4,7 @@
 set -e
 
 echo "=========================================="
-echo "初始化 douyin-downloader 项目..."
+echo "初始化 SalaryMeow Downloader..."
 echo "=========================================="
 
 # 检查 Python 版本
@@ -35,14 +35,8 @@ pip install --upgrade pip setuptools wheel
 # 安装项目依赖
 echo ""
 echo "安装项目依赖..."
-pip install -r requirements.txt
-pip install -e .
+python -m pip install -e ".[dev,full]"
 echo "依赖安装完成"
-
-# 安装开发依赖
-echo ""
-echo "安装开发依赖..."
-pip install -e ".[dev]" 2>/dev/null || echo "开发依赖安装跳过"
 
 # 安装 Playwright（可选）
 echo ""
@@ -54,20 +48,14 @@ echo ""
 echo "创建必要的目录..."
 mkdir -p data logs downloads
 
-# 创建 .env 文件
+# 创建本地配置文件
 echo ""
-echo "检查 .env 文件..."
-if [ -f ".env" ]; then
-    echo ".env 文件已存在"
+echo "检查 config.yaml 文件..."
+if [ -f "config.yaml" ]; then
+    echo "config.yaml 已存在"
 else
-    echo "创建 .env 文件..."
-    cat > .env << EOF
-ADMIN_USER=admin
-ADMIN_PASS=$(openssl rand -hex 32)
-DIRECT_INVITE_CODE=
-DEBUG=False
-EOF
-    echo ".env 文件创建成功"
+    cp config.yaml.example config.yaml
+    echo "已从 config.yaml.example 创建 config.yaml"
 fi
 
 # 初始化 Git
@@ -87,8 +75,8 @@ echo "=========================================="
 echo ""
 echo "后续步骤："
 echo "1. 激活虚拟环境: source .venv/bin/activate"
-echo "2. 编辑 config.yaml 配置 Cookie"
-echo "3. 运行项目: make run"
-echo "4. 运行测试: make test"
+echo "2. 编辑 config.yaml"
+echo "3. 运行项目: python -m uvicorn douyin_downloader.main:app --host 0.0.0.0 --port 8001 --reload"
+echo "4. 运行测试: pytest"
 echo ""
 echo "开始开发吧！"

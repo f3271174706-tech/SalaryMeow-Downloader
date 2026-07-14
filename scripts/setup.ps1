@@ -1,7 +1,7 @@
 # 项目初始化脚本（Windows PowerShell）
 
 Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host "初始化 douyin-downloader 项目..." -ForegroundColor Cyan
+Write-Host "初始化 SalaryMeow Downloader..." -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 
 # 检查 Python 版本
@@ -28,7 +28,7 @@ if (Test-Path ".venv") {
 # 激活虚拟环境
 Write-Host ""
 Write-Host "激活虚拟环境..." -ForegroundColor Yellow
-.venv\Scripts\Activate.ps1
+.\.venv\Scripts\Activate.ps1
 
 # 升级 pip
 Write-Host ""
@@ -38,19 +38,8 @@ python -m pip install --upgrade pip setuptools wheel
 # 安装项目依赖
 Write-Host ""
 Write-Host "安装项目依赖..." -ForegroundColor Yellow
-pip install -r requirements.txt
-pip install -e .
+python -m pip install -e ".[dev,full]"
 Write-Host "依赖安装完成" -ForegroundColor Green
-
-# 安装开发依赖
-Write-Host ""
-Write-Host "安装开发依赖..." -ForegroundColor Yellow
-try {
-    pip install -e ".[dev]"
-    Write-Host "开发依赖安装完成" -ForegroundColor Green
-} catch {
-    Write-Host "开发依赖安装跳过" -ForegroundColor Yellow
-}
 
 # 创建必要的目录
 Write-Host ""
@@ -60,21 +49,14 @@ Write-Host "创建必要的目录..." -ForegroundColor Yellow
 }
 Write-Host "目录创建完成" -ForegroundColor Green
 
-# 创建 .env 文件
+# 创建本地配置文件
 Write-Host ""
-Write-Host "检查 .env 文件..." -ForegroundColor Yellow
-if (Test-Path ".env") {
-    Write-Host ".env 文件已存在" -ForegroundColor Green
+Write-Host "检查 config.yaml 文件..." -ForegroundColor Yellow
+if (Test-Path "config.yaml") {
+    Write-Host "config.yaml 已存在" -ForegroundColor Green
 } else {
-    Write-Host "创建 .env 文件..." -ForegroundColor Yellow
-    $randomKey = -join ((1..32) | ForEach-Object { '{0:x}' -f (Get-Random -Max 16) })
-    @"
-ADMIN_USER=admin
-ADMIN_PASS=$randomKey
-DIRECT_INVITE_CODE=
-DEBUG=False
-"@ | Out-File -FilePath .env -Encoding UTF8
-    Write-Host ".env 文件创建成功" -ForegroundColor Green
+    Copy-Item "config.yaml.example" "config.yaml"
+    Write-Host "已从 config.yaml.example 创建 config.yaml" -ForegroundColor Green
 }
 
 # 初始化 Git
@@ -93,9 +75,9 @@ Write-Host "项目初始化完成！" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "后续步骤：" -ForegroundColor White
-Write-Host "1. 激活虚拟环境: .venv\Scripts\Activate.ps1" -ForegroundColor White
-Write-Host "2. 编辑 config.yaml 配置 Cookie" -ForegroundColor White
-Write-Host "3. 运行项目: make run" -ForegroundColor White
-Write-Host "4. 运行测试: make test" -ForegroundColor White
+Write-Host "1. 激活虚拟环境: .\.venv\Scripts\Activate.ps1" -ForegroundColor White
+Write-Host "2. 编辑 config.yaml" -ForegroundColor White
+Write-Host "3. 运行项目: python -m uvicorn douyin_downloader.main:app --host 0.0.0.0 --port 8001 --reload" -ForegroundColor White
+Write-Host "4. 运行测试: pytest" -ForegroundColor White
 Write-Host ""
 Write-Host "开始开发吧！" -ForegroundColor Green

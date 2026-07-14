@@ -7,7 +7,6 @@ import re
 import subprocess
 import threading
 import time
-import urllib.request
 import uuid
 from pathlib import Path
 
@@ -70,14 +69,8 @@ def _return_browser(browser):
 
 DOWNLOADS_DIR = Path(__file__).resolve().parent.parent.parent / "downloads"
 
-# Auto-detect system proxy for httpx (used for Twitter/TikTok)
-_system_proxies = urllib.request.getproxies()
-PROXY_URL = _system_proxies.get("http") or _system_proxies.get("https")
-
-# Set proxy env vars so httpx picks them up automatically (works with all httpx versions)
-if PROXY_URL:
-    os.environ.setdefault("HTTP_PROXY", PROXY_URL)
-    os.environ.setdefault("HTTPS_PROXY", PROXY_URL)
+# An empty network.proxy means direct connections.
+PROXY_URL = config.get_proxy()
 
 # Monkey-patch httpx to always use proxy from env vars (for older httpx versions)
 _orig_get = httpx.get
@@ -85,12 +78,18 @@ _orig_post = httpx.post
 
 
 def _get(*a, **kw):
-    kw.setdefault("trust_env", True)
+    if PROXY_URL:
+        kw.setdefault("proxy", PROXY_URL)
+    else:
+        kw.setdefault("trust_env", False)
     return _orig_get(*a, **kw)
 
 
 def _post(*a, **kw):
-    kw.setdefault("trust_env", True)
+    if PROXY_URL:
+        kw.setdefault("proxy", PROXY_URL)
+    else:
+        kw.setdefault("trust_env", False)
     return _orig_post(*a, **kw)
 
 
@@ -215,7 +214,7 @@ def _extract_images_with_playwright(share_url: str) -> tuple[list[str], list[str
     images = []
 
     # 从浏览器池获取实例
-    browser, pw = _get_browser()
+    browser, _pw = _get_browser()
     page = None
     try:
         page = browser.new_page()
@@ -600,16 +599,13 @@ def _extract_tiktok(url: str) -> dict:
     title = "tiktok_video"
     thumbnail = ""
     try:
-        r_resolve = httpx.get(
-            url, headers={"User-Agent": MOBILE_UA}, follow_redirects=True, timeout=15, proxy="http://127.0.0.1:7890"
-        )
+        r_resolve = httpx.get(url, headers={"User-Agent": MOBILE_UA}, follow_redirects=True, timeout=15)
         full_url = str(r_resolve.url)
 
         r_page = httpx.get(
             full_url,
             headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
             timeout=30,
-            proxy="http://127.0.0.1:7890",
         )
 
         scripts = re.findall(r"<script[^>]*>(.*?)</script>", r_page.text, re.DOTALL)
@@ -698,7 +694,7 @@ def _parse_twitter_url(url: str) -> tuple[str, str]:
 def _curl_get(url: str, timeout: int = 30) -> str:
     """Use subprocess curl to bypass httpx proxy issues on cloud servers."""
     cmd = ["curl", "-s", "-L", "--max-time", str(timeout), "-H", f"User-Agent: {MOBILE_UA}"]
-    proxy = os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY")
+    proxy = config.get_proxy()
     if proxy:
         cmd += ["--proxy", proxy]
     cmd.append(url)
@@ -712,8 +708,9 @@ def _curl_download(url: str, filepath: str, timeout: int = 120, headers: dict = 
     """Use subprocess curl to download a file. Returns file size."""
     cmd = ["curl", "-s", "-L", "--max-time", str(timeout), "-o", filepath]
     if use_proxy:
-        proxy = os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY") or "http://127.0.0.1:7890"
-        cmd += ["--proxy", proxy]
+        proxy = config.get_proxy()
+        if proxy:
+            cmd += ["--proxy", proxy]
     if headers:
         for k, v in headers.items():
             cmd += ["-H", f"{k}: {v}"]
@@ -1427,7 +1424,7 @@ def _download_twitter_video(url: str) -> tuple[str, str]:
                     base_url = m3u8_url.rsplit("/", 1)[0]
                     m3u8_url = base_url + "/" + stream_match
 
-        proxy = os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY")
+        proxy = config.get_proxy()
         cmd = ["ffmpeg", "-y"]
         if proxy:
             cmd += ["-http_proxy", proxy]
@@ -1644,7 +1641,7 @@ def download_video_for_stream(video_url: str, m3u8_url: str = "") -> tuple[str, 
                     base_url = m3u8_url.rsplit("/", 1)[0]
                     m3u8_url = base_url + "/" + stream_match
 
-        proxy = os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY")
+        proxy = config.get_proxy()
         cmd = ["ffmpeg", "-y"]
         if proxy:
             cmd += ["-http_proxy", proxy]

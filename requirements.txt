@@ -1,26 +1,10 @@
-<<<<<<< HEAD
-# 核心依赖
-=======
->>>>>>> 30e4c2f26e62986a7a3b4d3de2e8e4497d49ece2
+# Runtime dependencies. For development and all optional parsers, prefer:
+# python -m pip install -e ".[dev,full]"
 fastapi>=0.100.0,<1.0
 uvicorn[standard]>=0.20.0
 httpx>=0.24.0
 PyYAML>=6.0
-<<<<<<< HEAD
 pydantic>=2.0.0
 f2>=0.0.1.7
 TikTokApi>=7.0.0
 playwright>=1.40.0
-
-# 开发依赖（可选）
-# pytest>=7.0.0
-# pytest-cov>=4.0.0
-# ruff>=0.4.0
-# mypy>=1.0.0
-# pre-commit>=3.0.0
-=======
-f2>=0.0.1.7
-TikTokApi>=7.0.0
-playwright>=1.40.0
-pydantic>=2.0.0
->>>>>>> 30e4c2f26e62986a7a3b4d3de2e8e4497d49ece2

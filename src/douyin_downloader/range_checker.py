@@ -1,7 +1,9 @@
 """Range 请求支持检测工具"""
 
-import httpx
 from typing import Optional
+
+import httpx
+
 from douyin_downloader.config import get_logger
 
 logger = get_logger(__name__)
@@ -23,12 +25,7 @@ def check_range_support(url: str, timeout: int = 10) -> dict:
             "details": dict
         }
     """
-    result = {
-        "supported": False,
-        "method": "unknown",
-        "content_length": 0,
-        "details": {}
-    }
+    result = {"supported": False, "method": "unknown", "content_length": 0, "details": {}}
 
     try:
         # 方法1: HEAD 请求检查
@@ -55,12 +52,7 @@ def check_range_support(url: str, timeout: int = 10) -> dict:
 def _check_by_head(url: str, timeout: int) -> Optional[bool]:
     """通过 HEAD 响应检查"""
     try:
-        resp = httpx.head(
-            url,
-            headers={"User-Agent": "Mozilla/5.0"},
-            timeout=timeout,
-            follow_redirects=True
-        )
+        resp = httpx.head(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=timeout, follow_redirects=True)
 
         # 检查 Accept-Ranges 头
         accept_ranges = resp.headers.get("Accept-Ranges", "").lower()
@@ -70,7 +62,7 @@ def _check_by_head(url: str, timeout: int) -> Optional[bool]:
         # 有些服务器不声明但支持
         return None  # 需要进一步测试
 
-    except:
+    except Exception:
         return None
 
 
@@ -83,11 +75,7 @@ def _check_by_range(url: str, timeout: int) -> dict:
         }
         resp = httpx.get(url, headers=headers, timeout=timeout, follow_redirects=True)
 
-        result = {
-            "supported": False,
-            "content_length": 0,
-            "details": {}
-        }
+        result = {"supported": False, "content_length": 0, "details": {}}
 
         # 206 = 支持 Range
         if resp.status_code == 206:
@@ -102,7 +90,7 @@ def _check_by_range(url: str, timeout: int) -> dict:
                 try:
                     total_size = int(content_range.split("/")[-1])
                     result["content_length"] = total_size
-                except:
+                except (ValueError, IndexError):
                     pass
 
         # 200 = 不支持，但返回完整文件
@@ -117,11 +105,7 @@ def _check_by_range(url: str, timeout: int) -> dict:
         return result
 
     except Exception as e:
-        return {
-            "supported": False,
-            "content_length": 0,
-            "details": {"error": str(e)}
-        }
+        return {"supported": False, "content_length": 0, "details": {"error": str(e)}}
 
 
 def get_optimal_chunk_size(content_length: int) -> int:
@@ -134,14 +118,14 @@ def get_optimal_chunk_size(content_length: int) -> int:
     Returns:
         最优分块大小（字节）
     """
-    if content_length < 1 * 1024 * 1024:      # < 1MB
-        return 32768                            # 32KB
-    elif content_length < 10 * 1024 * 1024:    # < 10MB
-        return 65536                            # 64KB
-    elif content_length < 100 * 1024 * 1024:   # < 100MB
-        return 131072                           # 128KB
+    if content_length < 1 * 1024 * 1024:  # < 1MB
+        return 32768  # 32KB
+    elif content_length < 10 * 1024 * 1024:  # < 10MB
+        return 65536  # 64KB
+    elif content_length < 100 * 1024 * 1024:  # < 100MB
+        return 131072  # 128KB
     else:
-        return 262144                           # 256KB
+        return 262144  # 256KB
 
 
 def test_range_with_real_video(video_url: str) -> dict:
@@ -163,7 +147,7 @@ def test_range_with_real_video(video_url: str) -> dict:
         if result["content_length"]:
             logger.info(f"  ✓ 文件大小: {result['content_length'] / 1024 / 1024:.2f} MB")
     else:
-        logger.info(f"  ✗ 不支持 Range")
+        logger.info("  ✗ 不支持 Range")
 
     return result
 

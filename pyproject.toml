@@ -3,11 +3,11 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "douyin-downloader"
-version = "3.0.0"
-description = "多平台无水印下载器 - 抖音/Twitter/TikTok/B站/快手"
+name = "salarymeow-downloader"
+version = "1.0.1"
+description = "SalaryMeow Downloader：多平台媒体解析与下载服务"
 authors = [
-    {name = "fzp", email = "fzp@example.com"}
+    {name = "f3271174706-tech"}
 ]
 readme = "README.md"
 license = {text = "MIT"}
@@ -51,12 +51,13 @@ dev = [
 
 # 项目入口点
 [project.scripts]
-douyin-downloader = "douyin_downloader.main:main"
+salarymeow-downloader = "douyin_downloader.main:main"
 
 # 项目URL
 [project.urls]
-Homepage = "https://github.com/fzp/douyin-downloader"
-Repository = "https://github.com/fzp/douyin-downloader"
+Homepage = "https://github.com/f3271174706-tech/SalaryMeow-Downloader"
+Repository = "https://github.com/f3271174706-tech/SalaryMeow-Downloader"
+Issues = "https://github.com/f3271174706-tech/SalaryMeow-Downloader/issues"
 
 # setuptools 配置
 [tool.setuptools.packages.find]
@@ -117,6 +118,7 @@ python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
+asyncio_default_fixture_loop_scope = "function"
 
 # coverage 配置
 [tool.coverage.run]

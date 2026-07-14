@@ -7,6 +7,7 @@ import re
 import secrets
 import time
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -21,6 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.responses import Response
 
+from douyin_downloader.config import config
 from douyin_downloader.downloader import (
     DOWNLOADS_DIR,
     MOBILE_UA,
@@ -98,27 +100,28 @@ def _validate_url(url: str) -> bool:
         return False
 
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    cleanup_old_files(max_age_seconds=600)
+    yield
+
+
 app = FastAPI(
-    title="抖音/X 无水印下载器",
+    title="SalaryMeow Downloader",
     docs_url=None,
     redoc_url=None,
     openapi_url=None,
+    lifespan=lifespan,
 )
 
 
-@app.on_event("startup")
-async def startup_cleanup():
-    cleanup_old_files(max_age_seconds=600)
-
+cors_origins = config.get("app.cors_origins", [])
+if isinstance(cors_origins, str):
+    cors_origins = [cors_origins]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://fzpnowm.top",
-        "https://www.fzpnowm.top",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=cors_origins,
     allow_credentials=False,
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
@@ -154,8 +157,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 app.add_middleware(SecurityHeadersMiddleware)
 
 # ---- Admin 认证配置 ----
-ADMIN_USER = os.environ.get("ADMIN_USER", "admin")
-ADMIN_PASS = os.environ.get("ADMIN_PASS", "")
+ADMIN_USER = os.environ.get("ADMIN_USER") or config.get("auth.admin_user", "admin")
+ADMIN_PASS = os.environ.get("ADMIN_PASS") or config.get("auth.admin_password", "")
 ADMIN_SECRET = secrets.token_hex(32)
 ADMIN_SESSION_TTL = 86400
 ADMIN_MAX_ATTEMPTS = 5
@@ -163,8 +166,9 @@ ADMIN_LOCKOUT_SECONDS = 900
 _admin_login_attempts = {}
 
 # ---- 直连认证配置 ----
-DIRECT_INVITE_CODE = os.environ.get("DIRECT_INVITE_CODE", "")
+DIRECT_INVITE_CODE = os.environ.get("DIRECT_INVITE_CODE") or config.get("auth.invite_code", "")
 DIRECT_AUTH_ENABLED = bool(DIRECT_INVITE_CODE)
+COOKIE_SECURE = bool(config.get("auth.secure_cookies", False))
 
 # ---- 邀请码暴力破解防护 ----
 from collections import defaultdict
@@ -267,8 +271,9 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
 
 def _make_invite_token(code: str) -> str:
     """生成邀请码验证token"""
-    payload = f"{code}:{int(time.time()) // 86400}"
-    sig = hashlib.sha256(f"{payload}:{DIRECT_INVITE_CODE}".encode()).hexdigest()
+    day_round = int(time.time()) // 86400
+    payload = str(day_round)
+    sig = hmac.new(code.encode(), payload.encode(), hashlib.sha256).hexdigest()
     return f"{payload}:{sig}"
 
 
@@ -278,13 +283,16 @@ def _verify_invite_token(token: str) -> bool:
         return False
     try:
         parts = token.split(":")
-        if len(parts) != 3:
+        if len(parts) != 2:
             return False
-        code, day_round, sig = parts
-        payload = f"{code}:{day_round}"
-        expected = hashlib.sha256(f"{payload}:{DIRECT_INVITE_CODE}".encode()).hexdigest()
-        return hmac.compare_digest(sig, expected) and code == DIRECT_INVITE_CODE
-    except Exception:
+        day_round, sig = parts
+        token_day = int(day_round)
+        current_day = int(time.time()) // 86400
+        if token_day > current_day or current_day - token_day > 7:
+            return False
+        expected = hmac.new(DIRECT_INVITE_CODE.encode(), day_round.encode(), hashlib.sha256).hexdigest()
+        return hmac.compare_digest(sig, expected)
+    except (TypeError, ValueError):
         return False
 
 
@@ -463,7 +471,7 @@ async def verify_invite(req: InviteRequest, request: Request):
 
     _invite_attempts[client_ip].append(now)
 
-    if req.code == DIRECT_INVITE_CODE:
+    if hmac.compare_digest(req.code, DIRECT_INVITE_CODE):
         _invite_attempts[client_ip] = []
         token = _make_invite_token(req.code)
         response = HTMLResponse('{"ok":true}')
@@ -472,7 +480,7 @@ async def verify_invite(req: InviteRequest, request: Request):
             value=token,
             httponly=True,
             samesite="lax",
-            secure=False,
+            secure=COOKIE_SECURE,
             max_age=604800,
         )
         return response
@@ -658,7 +666,7 @@ async def admin_login(request: Request):
         value=token,
         httponly=True,
         samesite="lax",
-        secure=True,
+        secure=COOKIE_SECURE,
         max_age=ADMIN_SESSION_TTL,
     )
     return response
@@ -838,8 +846,8 @@ def _preload_video(url: str):
                 headers["Referer"] = ref
                 break
 
-        is_foreign = any(d in video_url for d in ["video.twimg.com", "tiktokcdn", "tiktokv.com", "ttwstatic.com"])
-        proxy = "http://127.0.0.1:7890" if is_foreign else None
+        proxy = config.get_proxy()
+        client_kwargs = {"proxy": proxy} if proxy else {"trust_env": False}
 
         with httpx.stream(
             "GET",
@@ -847,7 +855,7 @@ def _preload_video(url: str):
             headers=headers,
             follow_redirects=True,
             timeout=httpx.Timeout(connect=10, read=300, write=10, pool=10),
-            proxy=proxy,
+            **client_kwargs,
         ) as r:
             if r.status_code >= 400:
                 logger.warning(f"预下载失败: HTTP {r.status_code} for {video_url[:80]}")
@@ -964,10 +972,10 @@ async def stream_video(
         headers["Range"] = range_header
 
     try:
-        is_foreign = any(d in video_url for d in ["video.twimg.com", "tiktokcdn", "tiktokv.com", "ttwstatic.com"])
         client_kwargs = {"follow_redirects": True, "timeout": httpx.Timeout(connect=10, read=300, write=10, pool=10)}
-        if is_foreign:
-            client_kwargs["proxy"] = "http://127.0.0.1:7890"
+        proxy = config.get_proxy()
+        if proxy:
+            client_kwargs["proxy"] = proxy
         else:
             client_kwargs["trust_env"] = False
         client = httpx.AsyncClient(**client_kwargs)
@@ -1081,3 +1089,19 @@ def download_video_api(req: DownloadRequest):
             "Access-Control-Expose-Headers": "X-File-Size, Content-Disposition",
         },
     )
+
+
+def main() -> None:
+    """Run the packaged Uvicorn entry point."""
+    import uvicorn
+
+    uvicorn.run(
+        "douyin_downloader.main:app",
+        host=config.get("app.host", "0.0.0.0"),
+        port=int(config.get("app.port", 8001)),
+        reload=bool(config.get("app.reload", False)),
+    )
+
+
+if __name__ == "__main__":
+    main()

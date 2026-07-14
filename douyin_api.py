@@ -44,10 +44,10 @@ async def _extract_tiktok_api(url: str) -> Optional[dict]:
         if tiktok_cookie:
             # 将 cookie 字符串转换为字典格式
             cookies = {}
-            for item in tiktok_cookie.split(';'):
+            for item in tiktok_cookie.split(";"):
                 item = item.strip()
-                if '=' in item:
-                    key, value = item.split('=', 1)
+                if "=" in item:
+                    key, value = item.split("=", 1)
                     cookies[key.strip()] = value.strip()
 
             # 创建 session 并设置 cookie
@@ -58,7 +58,7 @@ async def _extract_tiktok_api(url: str) -> Optional[dict]:
                 browser="chromium",
                 proxies=proxies,
                 timeout=15000,  # 15 秒超时
-                allow_partial_sessions=True
+                allow_partial_sessions=True,
             )
         else:
             await api.create_sessions(
@@ -67,7 +67,7 @@ async def _extract_tiktok_api(url: str) -> Optional[dict]:
                 browser="chromium",
                 proxies=proxies,
                 timeout=15000,
-                allow_partial_sessions=True
+                allow_partial_sessions=True,
             )
 
         try:
@@ -80,27 +80,31 @@ async def _extract_tiktok_api(url: str) -> Optional[dict]:
                 return None
 
             # 提取标题
-            desc = video_info.get('desc', '未知标题')
+            desc = video_info.get("desc", "未知标题")
 
             # 提取视频 URL
-            video_data = video_info.get('video', {})
-            play_addr = video_data.get('play_addr', {})
-            url_list = play_addr.get('url_list', [])
-            video_url = url_list[0] if url_list else ''
+            video_data = video_info.get("video", {})
+            play_addr = video_data.get("play_addr", {})
+            url_list = play_addr.get("url_list", [])
+            video_url = url_list[0] if url_list else ""
 
             # 提取封面
-            cover = video_data.get('cover', {}).get('url_list', [''])[0] if video_data.get('cover', {}).get('url_list') else ''
+            cover = (
+                video_data.get("cover", {}).get("url_list", [""])[0]
+                if video_data.get("cover", {}).get("url_list")
+                else ""
+            )
 
             # 提取时长
-            duration = video_data.get('duration', 0)
+            duration = video_data.get("duration", 0)
 
             # 检查是否是图片帖子
-            images = video_info.get('images', [])
+            images = video_info.get("images", [])
             if images:
                 # 图片帖子
                 image_urls = []
                 for img in images:
-                    img_url = img.get('url_list', [''])[0] if img.get('url_list') else ''
+                    img_url = img.get("url_list", [""])[0] if img.get("url_list") else ""
                     if img_url:
                         image_urls.append(img_url)
 
@@ -143,8 +147,8 @@ async def _extract_douyin_api(url: str) -> Optional[dict]:
     """
     try:
         from f2.apps.douyin.crawler import DouyinCrawler
-        from f2.apps.douyin.utils import AwemeIdFetcher
         from f2.apps.douyin.model import PostDetail
+        from f2.apps.douyin.utils import AwemeIdFetcher
 
         logger.info(f"调用抖音 API (f2): {url}")
 
@@ -159,12 +163,12 @@ async def _extract_douyin_api(url: str) -> Optional[dict]:
         # 构建 kwargs
         douyin_cookie = config.get_cookie("douyin")
         kwargs = {
-            'proxies': {'http://': None, 'https://': None},
-            'headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36',
-                'referer': 'https://www.douyin.com/',
+            "proxies": {"http://": None, "https://": None},
+            "headers": {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36",
+                "referer": "https://www.douyin.com/",
             },
-            'cookie': douyin_cookie or '',
+            "cookie": douyin_cookie or "",
         }
 
         # 获取帖子详情
@@ -172,23 +176,23 @@ async def _extract_douyin_api(url: str) -> Optional[dict]:
             params = PostDetail(aweme_id=aweme_id)
             result = await crawler.fetch_post_detail(params)
 
-        if not result or 'aweme_detail' not in result:
+        if not result or "aweme_detail" not in result:
             logger.warning("f2 返回空数据")
             return None
 
-        detail = result['aweme_detail']
-        aweme_type = detail.get('aweme_type', 0)
-        desc = detail.get('desc', '未知标题')
+        detail = result["aweme_detail"]
+        aweme_type = detail.get("aweme_type", 0)
+        desc = detail.get("desc", "未知标题")
 
         # 获取封面
-        cover = ''
-        video_cover = detail.get('video', {}).get('cover', {})
-        if video_cover and video_cover.get('url_list'):
-            cover = video_cover['url_list'][0]
+        cover = ""
+        video_cover = detail.get("video", {}).get("cover", {})
+        if video_cover and video_cover.get("url_list"):
+            cover = video_cover["url_list"][0]
 
         # 判断类型
         # aweme_type: 68=动图, 0=视频, 51=图文
-        images = detail.get('images', [])
+        images = detail.get("images", [])
 
         # 检查是否是动图（live_photo）
         # 动图必须满足：aweme_type == 68 或者 images 中有视频数据
@@ -196,11 +200,11 @@ async def _extract_douyin_api(url: str) -> Optional[dict]:
         if not is_live_photo and images:
             # 只有当 images 中有 video 字段且包含有效视频 URL 时才认为是动图
             for img in images:
-                video_info = img.get('video', {})
+                video_info = img.get("video", {})
                 if video_info:
-                    play_addr = video_info.get('play_addr', {})
-                    url_list = play_addr.get('url_list', [])
-                    if url_list and any('douyinvod' in url or 'zjcdn' in url for url in url_list):
+                    play_addr = video_info.get("play_addr", {})
+                    url_list = play_addr.get("url_list", [])
+                    if url_list and any("douyinvod" in url or "zjcdn" in url for url in url_list):
                         is_live_photo = True
                         break
 
@@ -211,25 +215,25 @@ async def _extract_douyin_api(url: str) -> Optional[dict]:
 
             for img in images:
                 # 获取图片 URL
-                url_list = img.get('url_list', [])
+                url_list = img.get("url_list", [])
                 if url_list:
                     image_urls.append(url_list[0])
 
                 # 获取视频 URL（在 img.video.play_addr.url_list 中）
-                video_info = img.get('video', {})
+                video_info = img.get("video", {})
                 if video_info:
-                    play_addr = video_info.get('play_addr', {})
-                    v_url_list = play_addr.get('url_list', [])
+                    play_addr = video_info.get("play_addr", {})
+                    v_url_list = play_addr.get("url_list", [])
                     if v_url_list:
                         video_urls.append(v_url_list[0])
 
             # 获取音乐
-            music_url = ''
-            music_info = detail.get('music', {})
+            music_url = ""
+            music_info = detail.get("music", {})
             if music_info:
-                play_url = music_info.get('play_url', {})
-                if isinstance(play_url, dict) and play_url.get('uri'):
-                    music_url = play_url['uri']
+                play_url = music_info.get("play_url", {})
+                if isinstance(play_url, dict) and play_url.get("uri"):
+                    music_url = play_url["uri"]
                 elif isinstance(play_url, str):
                     music_url = play_url
 
@@ -261,17 +265,17 @@ async def _extract_douyin_api(url: str) -> Optional[dict]:
             # 普通图片类型
             image_urls = []
             for img in images:
-                url_list = img.get('url_list', [])
+                url_list = img.get("url_list", [])
                 if url_list:
                     image_urls.append(url_list[0])
 
             # 获取音乐
-            music_url = ''
-            music_info = detail.get('music', {})
+            music_url = ""
+            music_info = detail.get("music", {})
             if music_info:
-                play_url = music_info.get('play_url', {})
-                if isinstance(play_url, dict) and play_url.get('uri'):
-                    music_url = play_url['uri']
+                play_url = music_info.get("play_url", {})
+                if isinstance(play_url, dict) and play_url.get("uri"):
+                    music_url = play_url["uri"]
                 elif isinstance(play_url, str):
                     music_url = play_url
 
@@ -287,11 +291,11 @@ async def _extract_douyin_api(url: str) -> Optional[dict]:
 
         else:
             # 视频类型
-            video_info = detail.get('video', {})
-            play_addr = video_info.get('play_addr', {})
-            url_list = play_addr.get('url_list', [])
+            video_info = detail.get("video", {})
+            play_addr = video_info.get("play_addr", {})
+            url_list = play_addr.get("url_list", [])
 
-            duration = video_info.get('duration', 0)
+            duration = video_info.get("duration", 0)
 
             return {
                 "title": desc,

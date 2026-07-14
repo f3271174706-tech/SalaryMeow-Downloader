@@ -18,6 +18,19 @@ BASE_DIR = Path(__file__).parent
 
 # 默认配置（当 config.yaml 不存在时使用）
 DEFAULT_CONFIG = {
+    "app": {
+        # 保留旧入口原有的跨域默认行为；可在 config.yaml 中收紧。
+        "cors_origins": ["*"],
+        "host": "0.0.0.0",
+        "port": 8001,
+        "reload": False,
+    },
+    "auth": {
+        "admin_user": "admin",
+        "admin_password": "",
+        "invite_code": "",
+        "secure_cookies": False,
+    },
     "network": {
         "timeout": 30,
         "connect_timeout": 10,
@@ -102,7 +115,7 @@ class Config:
         # 如果配置文件存在，读取并合并
         if config_path.exists():
             try:
-                with open(config_path, "r", encoding="utf-8") as f:
+                with open(config_path, encoding="utf-8") as f:
                     user_config = yaml.safe_load(f) or {}
                 self._config = _deep_merge(self._config, user_config)
             except Exception as e:
@@ -137,6 +150,7 @@ class Config:
     def get_cookie(self, platform: str) -> str:
         """获取指定平台的 Cookie（随机选择可用的）"""
         import random
+
         cookies = self.get(f"cookies.{platform}", "")
         if isinstance(cookies, list):
             # 过滤掉空 Cookie 和之前失败的
@@ -168,6 +182,7 @@ class Config:
         if isinstance(cookies, list):
             # 随机选择一个不同的
             import random
+
             valid = [c for c in cookies if c]
             if valid:
                 return random.choice(valid)

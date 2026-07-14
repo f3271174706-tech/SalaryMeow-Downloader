@@ -2,8 +2,8 @@
 
 ## [1.0.1] - 2026-07-09
 
-### 性能优化
-- 集成 f2 API 模式，解析速度提升 3-4 倍
+### 功能与结构
+- 集成 f2 API 解析模式
 - 智能分块下载：根据文件大小动态调整（32KB-256KB）
 - 新增 Range 支持检测工具（range_checker.py）
 - 禁用自动剪切板检测，改为手动粘贴
@@ -51,11 +51,3 @@ src/douyin_downloader/
 ├── douyin_api.py    # API 模块
 └── utils.py         # 工具函数
 ```
-
-## [2.x] - 历史版本
-
-- 多平台无水印下载支持
-- Liquid Glass UI 3.0
-- 流式代理 + Range 支持
-- Admin 管理后台
-- 安全防护（SSRF、CSP、CORS）

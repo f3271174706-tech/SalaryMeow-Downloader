@@ -1,102 +1,77 @@
-<<<<<<< HEAD
-# 虚拟环境
+# Python virtual environments and build output
 .venv/
 venv/
 env/
 ENV/
-
-# Python 缓存
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
-.installed.cfg
+.eggs/
 *.egg
 
-# IDE
+# Test, type-checker, and linter caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.hypothesis/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Editors and operating systems
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# 环境变量
-.env
-.env.local
-.env.*.local
-
-# 系统文件
 .DS_Store
 Thumbs.db
 Desktop.ini
 
-# 测试和覆盖率
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-
-# mypy
-.mypy_cache/
-
-# ruff
-.ruff_cache/
-
-# 日志文件
-*.log
-logs/
-
-# 临时下载文件
+# Runtime output
 downloads/
-
-# npm 缓存
-npm-cache/
-
-# 配置文件（包含 Cookie，不提交）
-config.yaml
-
-# 部署文档（包含服务器敏感信息）
-docs/DEPLOY.md
-
-# SSH 密钥
-*.pem
-id_ed25519
-id_rsa
-
-# 数据文件
+logs/
+*.log
 data/*.jsonl
-=======
-__pycache__/
-*.pyc
-config.yaml
-DEPLOY.md
-static/index.html.bak
-downloads/
-logs/
-*.log
-test_*.py
-test_*.json
 npm-cache/
->>>>>>> 30e4c2f26e62986a7a3b4d3de2e8e4497d49ece2
+
+# Local environment and configuration
+.env
+.env.*
+!.env.example
+config.yaml
+config.local.yaml
+config.*.local.yaml
+*.local.json
+project.private.local.json
+
+# Private deployment material (public examples remain trackable)
+/DEPLOY/
+/DEPLOY.md
+/docs/DEPLOY.md
+/docs/DEPLOY.private.md
+/docs/private/
+
+# Credentials, keys, and exported browser sessions
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+*.cookie
+*.cookies
+cookies.txt
+cookies.json
+storage_state.json
+auth_state.json
