@@ -20,6 +20,8 @@ class AuthService:
         self._failure_lock = threading.Lock()
 
     def require_invite_session(self, request: Request) -> None:
+        if not self.settings.security.invite_auth_enabled:
+            return
         token = request.cookies.get("direct_invite", "")
         if not verify_session_token(
             self.settings,
@@ -31,6 +33,8 @@ class AuthService:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="需要邀请码会话")
 
     def verify_invite(self, code: str, request: Request, response: Response) -> dict[str, bool]:
+        if not self.settings.security.invite_auth_enabled:
+            return {"success": True}
         ip = get_client_ip(request, self.settings)
         self._check_failures(self._invite_failures, ip)
         if not verify_invite_code(self.settings, code.strip()):

@@ -16,6 +16,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 class SecuritySettings(BaseModel):
     app_env: str = Field(default="development")
+    invite_auth_enabled: bool = True
     session_secret: str = Field(default="")
     invite_codes: list[str] = Field(default_factory=list)
     invite_session_ttl_seconds: int = 7 * 24 * 3600
@@ -85,7 +86,7 @@ class AppSettings(BaseModel):
         if self.is_production:
             if len(self.security.session_secret) < 32:
                 raise RuntimeError("DOUYIN_SESSION_SECRET must be set to at least 32 characters in production")
-            if not self.security.invite_codes:
+            if self.security.invite_auth_enabled and not self.security.invite_codes:
                 raise RuntimeError("DOUYIN_INVITE_CODES must be set in production")
             if not self.security.secure_cookies:
                 raise RuntimeError("DOUYIN_SECURE_COOKIES must be true in production")
@@ -122,6 +123,7 @@ def _apply_env(data: dict[str, Any]) -> dict[str, Any]:
 
     env_map = {
         "DOUYIN_APP_ENV": (security, "app_env"),
+        "DOUYIN_INVITE_AUTH_ENABLED": (security, "invite_auth_enabled"),
         "DOUYIN_SESSION_SECRET": (security, "session_secret"),
         "ADMIN_USER": (security, "admin_user"),
         "ADMIN_PASS": (security, "admin_password"),

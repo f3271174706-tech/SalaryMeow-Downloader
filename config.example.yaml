@@ -6,6 +6,7 @@ cors_origins:
   - http://localhost:9000
 security:
   app_env: development
+  invite_auth_enabled: true
   session_secret: replace-with-at-least-32-random-characters
   invite_codes:
     - change-me-invite-code

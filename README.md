@@ -134,6 +134,7 @@ DOUYIN_F2_PREWARM_ENABLED=true
 | `DOUYIN_HOST` | `127.0.0.1` | 监听地址 |
 | `DOUYIN_PORT` | `9000` | 监听端口 |
 | `DOUYIN_INVITE_CODES` | 空 | 逗号分隔的邀请码 |
+| `DOUYIN_INVITE_AUTH_ENABLED` | `true` | 是否要求邀请码会话；公开站点可设为 `false` |
 | `DOUYIN_SESSION_SECRET` | 开发环境临时生成 | Session 签名密钥，生产至少 32 字符 |
 | `ADMIN_USER` | `admin` | 管理员用户名 |
 | `ADMIN_PASS` | 空 | 管理员密码；为空时后台禁用 |

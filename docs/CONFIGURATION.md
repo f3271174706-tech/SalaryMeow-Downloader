@@ -7,6 +7,7 @@
 - `DOUYIN_APP_ENV`：`development` 或 `production`。
 - `DOUYIN_SESSION_SECRET`：Session 签名密钥，生产必填，至少 32 字符。
 - `DOUYIN_INVITE_CODES`：逗号分隔的邀请码，生产必填。
+- `DOUYIN_INVITE_AUTH_ENABLED`：是否启用邀请码保护，默认 `true`；公开站点可设为 `false`。
 - `ADMIN_USER`：管理员用户名，默认 `admin`。
 - `ADMIN_PASS`：管理员密码；缺失时管理模块禁用。
 - `DOUYIN_TRUST_PROXY_HEADERS`：是否信任代理头，默认 `false`。
@@ -27,7 +28,7 @@
 
 生产差异：
 
-- 生产缺少 `DOUYIN_SESSION_SECRET` 或 `DOUYIN_INVITE_CODES` 会启动失败。
+- 生产缺少 `DOUYIN_SESSION_SECRET` 会启动失败；邀请码保护开启时缺少 `DOUYIN_INVITE_CODES` 也会启动失败。
 - 管理后台缺少 `ADMIN_PASS` 不开放记录接口。
 - 可信代理头默认不启用，Cloudflare Tunnel 部署时只在本机/可信代理边界启用。
 

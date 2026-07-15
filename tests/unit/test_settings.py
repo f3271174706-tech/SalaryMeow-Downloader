@@ -28,6 +28,21 @@ def test_production_requires_secure_cookies() -> None:
         settings.validate_for_startup()
 
 
+def test_production_can_disable_invite_auth_without_codes() -> None:
+    settings = AppSettings.model_validate(
+        {
+            "security": {
+                "app_env": "production",
+                "invite_auth_enabled": False,
+                "session_secret": "x" * 32,
+                "secure_cookies": True,
+            }
+        }
+    )
+
+    assert settings.validate_for_startup() == []
+
+
 def test_repr_secret_redaction_from_legacy_config() -> None:
     from app.legacy.config import config
 

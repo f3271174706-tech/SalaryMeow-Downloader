@@ -5,9 +5,10 @@ import importlib
 from fastapi.testclient import TestClient
 
 
-def _client(monkeypatch):
+def _client(monkeypatch, *, invite_auth_enabled: bool = True):
     monkeypatch.setenv("DOUYIN_SESSION_SECRET", "test-session-secret-test-session-secret")
     monkeypatch.setenv("DOUYIN_INVITE_CODES", "let-me-in")
+    monkeypatch.setenv("DOUYIN_INVITE_AUTH_ENABLED", str(invite_auth_enabled).lower())
     monkeypatch.delenv("ADMIN_PASS", raising=False)
     monkeypatch.setenv("DOUYIN_SECURE_COOKIES", "false")
     from app.core.settings import get_settings
@@ -55,3 +56,14 @@ def test_admin_records_default_denied_when_admin_disabled(monkeypatch) -> None:
     response = client.get("/api/admin/records")
 
     assert response.status_code == 503
+
+
+def test_invite_auth_can_be_disabled(monkeypatch) -> None:
+    client = _client(monkeypatch, invite_auth_enabled=False)
+
+    index = client.get("/")
+    verification = client.post("/api/verify-invite", json={"code": "anything"})
+
+    assert index.status_code == 200
+    assert verification.status_code == 200
+    assert "direct_invite=" not in verification.headers.get("set-cookie", "")
