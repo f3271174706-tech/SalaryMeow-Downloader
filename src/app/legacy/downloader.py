@@ -14,6 +14,7 @@ from pathlib import Path
 import httpx
 
 from app.infrastructure.safe_http import safe_get, safe_stream
+from app.infrastructure.url_safety import UrlSafetyError, validate_url
 
 from .config import config, get_logger
 from .utils import (
@@ -842,6 +843,19 @@ def _extract_twitter(url: str) -> dict:
     }
 
 
+def _select_bilibili_video_url(durl: dict) -> str:
+    """Prefer a Bilibili media URL already covered by the strict platform allowlist."""
+    candidates = [durl.get("url", ""), *durl.get("backup_url", [])]
+    for candidate in candidates:
+        if not candidate:
+            continue
+        try:
+            return validate_url(candidate, platform="bilibili", resolve_dns=False).normalized
+        except UrlSafetyError:
+            continue
+    raise ValueError("B站未返回受信任的视频线路")
+
+
 def _extract_bilibili(url: str) -> dict:
     """Extract Bilibili video info via API (no cookies needed for 480p)."""
     # Resolve b23.tv short links
@@ -880,6 +894,8 @@ def _extract_bilibili(url: str) -> dict:
     thumbnail = video_data.get("pic", "")
     if thumbnail.startswith("//"):
         thumbnail = "https:" + thumbnail
+    elif thumbnail.startswith("http://"):
+        thumbnail = "https://" + thumbnail.removeprefix("http://")
 
     # Step 2: Get video stream URL (durl = single file, no need to merge)
     # qn: 16=360p, 32=480p, 64=720p, 80=1080p, 112=1080p+, 116=1080p60
@@ -893,7 +909,7 @@ def _extract_bilibili(url: str) -> dict:
     if not durls:
         raise ValueError("B站未返回视频地址")
 
-    video_url = durls[0].get("url", "")
+    video_url = _select_bilibili_video_url(durls[0])
 
     return {
         "title": title,
