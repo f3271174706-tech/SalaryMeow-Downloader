@@ -10,6 +10,7 @@
 - `DOUYIN_INVITE_AUTH_ENABLED`：是否启用邀请码保护，默认 `true`；公开站点可设为 `false`。
 - `ADMIN_USER`：管理员用户名，默认 `admin`。
 - `ADMIN_PASS`：管理员密码；缺失时管理模块禁用。
+- `ADMIN_EXTERNAL_URL`：可选的共享后台地址；设置后 `/admin` 与 `/admin/login` 会跳转过去。
 - `DOUYIN_TRUST_PROXY_HEADERS`：是否信任代理头，默认 `false`。
 - `DOUYIN_TRUSTED_PROXY_CIDRS`：可信代理 CIDR，启用代理头时建议配置。
 - `DOUYIN_METADATA_CACHE_TTL_SECONDS`：元数据缓存秒数，默认 `600`。
@@ -25,6 +26,8 @@
 - `DOUYIN_DATA_DIR`、`DOUYIN_DOWNLOADS_DIR`、`DOUYIN_LOGS_DIR`：数据、下载和日志目录。
 - `DOUYIN_SECURE_COOKIES`：本地 HTTP 开发设为 `false`，生产 HTTPS 必须为 `true`。
 - `DOUYIN_MAX_DOWNLOAD_BYTES`、`DOUYIN_MAX_STREAM_BYTES`：单次下载和流式响应的最大字节数。
+- `DOUYIN_RECORDS_FILE`：可选的共享解析记录 JSONL 文件路径。
+- `DOUYIN_RECORDS_MAX_FILE_BYTES`：记录文件轮转上限；共享旧项目文件时可设为 `0`。
 
 生产差异：
 

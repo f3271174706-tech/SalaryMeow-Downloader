@@ -12,6 +12,8 @@ security:
     - change-me-invite-code
   admin_user: admin
   admin_password: change-me-admin-password
+  # Optional shared admin dashboard; /admin and /admin/login redirect here.
+  admin_external_url: ""
   trust_proxy_headers: false
   trusted_proxy_cidrs: []
   secure_cookies: false
@@ -38,6 +40,8 @@ resources:
   preload_cache_max_entries: 20
   preload_concurrency: 1
   preload_wait_seconds: 2.0
+  # Set to 0 when a legacy deployment owns the shared record file.
+  records_max_file_bytes: 20971520
   f2_prewarm_enabled: true
 api:
   enabled: true
@@ -53,3 +57,4 @@ paths:
   data_dir: var
   downloads_dir: var/downloads
   logs_dir: var/logs
+  records_file: null

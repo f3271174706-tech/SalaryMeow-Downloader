@@ -138,6 +138,7 @@ DOUYIN_F2_PREWARM_ENABLED=true
 | `DOUYIN_SESSION_SECRET` | 开发环境临时生成 | Session 签名密钥，生产至少 32 字符 |
 | `ADMIN_USER` | `admin` | 管理员用户名 |
 | `ADMIN_PASS` | 空 | 管理员密码；为空时后台禁用 |
+| `ADMIN_EXTERNAL_URL` | 空 | 将本实例后台页面重定向到共享管理后台 |
 | `DOUYIN_HTTP_PROXY` | 空 | 仅供 TikTok 和 X/Twitter 使用的 HTTP 代理 |
 | `DOUYIN_F2_PREWARM_ENABLED` | `true` | 启动时预热抖音 f2 请求栈 |
 | `DOUYIN_METADATA_CACHE_TTL_SECONDS` | `600` | 成功解析结果的进程内缓存时间 |
@@ -145,6 +146,7 @@ DOUYIN_F2_PREWARM_ENABLED=true
 | `DOUYIN_PRELOAD_PLATFORMS` | `douyin` | 允许智能预下载的平台列表 |
 | `DOUYIN_PRELOAD_MAX_DURATION_SECONDS` | `180` | 只预下载不超过该时长的普通视频 |
 | `DOUYIN_PRELOAD_MAX_BYTES` | 100 MiB | 单个预下载文件的硬上限 |
+| `DOUYIN_RECORDS_FILE` | 空 | 可选的共享解析记录 JSONL 路径 |
 | `DOUYIN_MAX_STREAM_BYTES` | 1 GiB | 单次流式响应上限 |
 | `DOUYIN_MAX_DOWNLOAD_BYTES` | 1 GiB | 单次文件下载上限 |
 | `DOUYIN_SECURE_COOKIES` | `false` | HTTPS 生产环境必须设为 `true` |

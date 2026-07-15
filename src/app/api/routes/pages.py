@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.api.dependencies import get_auth_service, settings_dep
 from app.core.settings import AppSettings
@@ -83,11 +83,15 @@ def index_v2(settings: AppSettings = Depends(settings_dep)):
     return HTMLResponse((settings.paths.web_static_dir / "index-v2.html").read_text(encoding="utf-8"))
 
 
-@router.get("/admin/login")
-def admin_login_page() -> HTMLResponse:
+@router.get("/admin/login", response_model=None)
+def admin_login_page(settings: AppSettings = Depends(settings_dep)) -> HTMLResponse | RedirectResponse:
+    if settings.security.admin_external_url:
+        return RedirectResponse(settings.security.admin_external_url, status_code=302)
     return HTMLResponse(ADMIN_HTML)
 
 
-@router.get("/admin")
-def admin_page() -> HTMLResponse:
+@router.get("/admin", response_model=None)
+def admin_page(settings: AppSettings = Depends(settings_dep)) -> HTMLResponse | RedirectResponse:
+    if settings.security.admin_external_url:
+        return RedirectResponse(settings.security.admin_external_url, status_code=302)
     return HTMLResponse(ADMIN_HTML)

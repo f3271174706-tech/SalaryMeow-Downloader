@@ -53,3 +53,10 @@ def test_network_proxy_is_loaded() -> None:
     settings = AppSettings.model_validate({"network": {"proxy": "http://127.0.0.1:7897"}})
 
     assert settings.network.proxy == "http://127.0.0.1:7897"
+
+
+def test_shared_admin_url_requires_https() -> None:
+    settings = AppSettings.model_validate({"security": {"admin_external_url": "http://legacy.example.com/admin"}})
+
+    with pytest.raises(RuntimeError, match="ADMIN_EXTERNAL_URL"):
+        settings.validate_for_startup()

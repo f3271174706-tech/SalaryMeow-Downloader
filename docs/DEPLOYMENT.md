@@ -61,6 +61,8 @@ sudo systemctl enable --now douyin-downloader-refactor-cleanup.timer douyin-down
 
 当前建议 `--workers 1`，因为 Session 以外仍有兼容层内存缓存和浏览器池。
 
+需要多套部署共用一个后台时，可复制 `deploy/systemd/shared-admin.example.conf` 为应用 service drop-in，设置共享后台 HTTPS 地址与共享 `parse_records.jsonl` 路径，然后执行 `systemctl daemon-reload` 并重启应用。共享旧版记录文件时应将 `DOUYIN_RECORDS_MAX_FILE_BYTES=0`，避免新项目轮转旧项目管理的文件。
+
 浏览器必须使用与 `app.env` 相同的 `PLAYWRIGHT_BROWSERS_PATH` 安装，并确保 `douyin` 用户可读。
 
 ## Cloudflare Tunnel

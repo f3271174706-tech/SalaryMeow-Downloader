@@ -7,6 +7,7 @@ import secrets
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import yaml
 from pydantic import BaseModel, Field
@@ -22,6 +23,7 @@ class SecuritySettings(BaseModel):
     invite_session_ttl_seconds: int = 7 * 24 * 3600
     admin_user: str = "admin"
     admin_password: str = ""
+    admin_external_url: str = ""
     admin_session_ttl_seconds: int = 24 * 3600
     trust_proxy_headers: bool = False
     trusted_proxy_cidrs: list[str] = Field(default_factory=list)
@@ -48,6 +50,7 @@ class ResourceSettings(BaseModel):
     preload_cache_max_entries: int = 20
     preload_concurrency: int = 1
     preload_wait_seconds: float = 2.0
+    records_max_file_bytes: int = 20 * 1024 * 1024
     f2_prewarm_enabled: bool = True
 
 
@@ -55,6 +58,7 @@ class PathSettings(BaseModel):
     data_dir: Path = PROJECT_ROOT / "var"
     downloads_dir: Path = PROJECT_ROOT / "var" / "downloads"
     logs_dir: Path = PROJECT_ROOT / "var" / "logs"
+    records_file: Path | None = None
     web_static_dir: Path = PROJECT_ROOT / "web" / "static"
     web_templates_dir: Path = PROJECT_ROOT / "web" / "templates"
 
@@ -83,6 +87,10 @@ class AppSettings(BaseModel):
 
     def validate_for_startup(self) -> list[str]:
         warnings: list[str] = []
+        if self.security.admin_external_url:
+            admin_url = urlparse(self.security.admin_external_url)
+            if admin_url.scheme != "https" or not admin_url.hostname:
+                raise RuntimeError("ADMIN_EXTERNAL_URL must be an absolute HTTPS URL")
         if self.is_production:
             if len(self.security.session_secret) < 32:
                 raise RuntimeError("DOUYIN_SESSION_SECRET must be set to at least 32 characters in production")
@@ -127,6 +135,7 @@ def _apply_env(data: dict[str, Any]) -> dict[str, Any]:
         "DOUYIN_SESSION_SECRET": (security, "session_secret"),
         "ADMIN_USER": (security, "admin_user"),
         "ADMIN_PASS": (security, "admin_password"),
+        "ADMIN_EXTERNAL_URL": (security, "admin_external_url"),
         "DOUYIN_TRUST_PROXY_HEADERS": (security, "trust_proxy_headers"),
         "DOUYIN_SECURE_COOKIES": (security, "secure_cookies"),
         "DOUYIN_PRELOAD_ENABLED": (resources, "preload_enabled"),
@@ -138,12 +147,14 @@ def _apply_env(data: dict[str, Any]) -> dict[str, Any]:
         "DOUYIN_PRELOAD_CACHE_MAX_ENTRIES": (resources, "preload_cache_max_entries"),
         "DOUYIN_PRELOAD_CONCURRENCY": (resources, "preload_concurrency"),
         "DOUYIN_PRELOAD_WAIT_SECONDS": (resources, "preload_wait_seconds"),
+        "DOUYIN_RECORDS_MAX_FILE_BYTES": (resources, "records_max_file_bytes"),
         "DOUYIN_F2_PREWARM_ENABLED": (resources, "f2_prewarm_enabled"),
         "DOUYIN_MAX_STREAM_BYTES": (resources, "max_stream_bytes"),
         "DOUYIN_MAX_DOWNLOAD_BYTES": (resources, "max_download_bytes"),
         "DOUYIN_DATA_DIR": (paths, "data_dir"),
         "DOUYIN_DOWNLOADS_DIR": (paths, "downloads_dir"),
         "DOUYIN_LOGS_DIR": (paths, "logs_dir"),
+        "DOUYIN_RECORDS_FILE": (paths, "records_file"),
         "DOUYIN_HTTP_PROXY": (network, "proxy"),
         "DOUYIN_HOST": (data, "host"),
         "DOUYIN_PORT": (data, "port"),
@@ -164,10 +175,13 @@ def _apply_env(data: dict[str, Any]) -> dict[str, Any]:
                 "preload_cache_max_bytes",
                 "preload_cache_max_entries",
                 "preload_concurrency",
+                "records_max_file_bytes",
             }:
                 target[key] = int(raw)
             elif key == "preload_wait_seconds":
                 target[key] = float(raw)
+            elif key == "records_file" and not raw.strip():
+                target[key] = None
             else:
                 target[key] = raw
 

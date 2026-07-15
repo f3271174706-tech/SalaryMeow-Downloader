@@ -67,3 +67,13 @@ def test_invite_auth_can_be_disabled(monkeypatch) -> None:
     assert index.status_code == 200
     assert verification.status_code == 200
     assert "direct_invite=" not in verification.headers.get("set-cookie", "")
+
+
+def test_admin_pages_can_redirect_to_shared_dashboard(monkeypatch) -> None:
+    monkeypatch.setenv("ADMIN_EXTERNAL_URL", "https://legacy.example.com/admin")
+    client = _client(monkeypatch)
+
+    response = client.get("/admin", follow_redirects=False)
+
+    assert response.status_code == 302
+    assert response.headers["location"] == "https://legacy.example.com/admin"
