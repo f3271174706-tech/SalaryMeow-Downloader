@@ -52,7 +52,8 @@ def ready(settings: AppSettings = Depends(settings_dep)) -> dict:
     status = (
         "ok"
         if all(
-            value in {"ok", "enabled", "disabled", "ignored", "degraded", "package-only"} for value in checks.values()
+            value in {"ok", "enabled", "disabled", "ignored", "trusted", "degraded", "package-only"}
+            for value in checks.values()
         )
         else "error"
     )

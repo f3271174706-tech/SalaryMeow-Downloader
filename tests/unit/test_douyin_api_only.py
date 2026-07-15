@@ -25,7 +25,9 @@ def _disable_cache(monkeypatch) -> None:
     monkeypatch.setattr(
         downloader.config,
         "get",
-        lambda key, default=None: True if key == "api.enabled" else 5 if key == "api.timeout" else original_get(key, default),
+        lambda key, default=None: (
+            True if key == "api.enabled" else 5 if key == "api.timeout" else original_get(key, default)
+        ),
     )
 
 

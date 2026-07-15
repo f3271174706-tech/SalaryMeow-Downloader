@@ -44,6 +44,21 @@ sudo systemctl status douyin-downloader-refactor
 journalctl -u douyin-downloader-refactor -f
 ```
 
+可选安装定时清理和简单自愈：
+
+```bash
+sudo install -m 0644 deploy/systemd/cleanup.service /etc/systemd/system/douyin-downloader-refactor-cleanup.service
+sudo install -m 0644 deploy/systemd/cleanup.timer /etc/systemd/system/douyin-downloader-refactor-cleanup.timer
+sudo install -m 0644 deploy/systemd/healthcheck.service /etc/systemd/system/douyin-downloader-refactor-healthcheck.service
+sudo install -m 0644 deploy/systemd/healthcheck.timer /etc/systemd/system/douyin-downloader-refactor-healthcheck.timer
+sudo chmod 0755 /opt/douyin-downloader-refactor/scripts/cleanup_downloads.sh
+sudo chmod 0755 /opt/douyin-downloader-refactor/scripts/healthcheck.sh
+sudo systemctl daemon-reload
+sudo systemctl enable --now douyin-downloader-refactor-cleanup.timer douyin-downloader-refactor-healthcheck.timer
+```
+
+清理 timer 默认每 5 分钟删除超过 15 分钟的临时文件；健康检查每 2 分钟访问 `/health/live`，失败时重启应用。若需要同时检查 Tunnel，可在 healthcheck service 中设置 `DOUYIN_TUNNEL_SERVICE_NAME`。
+
 当前建议 `--workers 1`，因为 Session 以外仍有兼容层内存缓存和浏览器池。
 
 浏览器必须使用与 `app.env` 相同的 `PLAYWRIGHT_BROWSERS_PATH` 安装，并确保 `douyin` 用户可读。

@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from app.api.dependencies import (
     get_parser_service,
+    get_preload_service,
     get_record_service,
     parse_limit,
     require_invite_session,
@@ -18,6 +19,7 @@ from app.core.security import get_client_ip
 from app.core.settings import AppSettings
 from app.infrastructure.rate_limit import ConcurrencyLimit, ConcurrencyLimitExceeded
 from app.services.parser_service import ParserService
+from app.services.preload_service import PreloadService
 from app.services.record_service import RecordService
 
 router = APIRouter(prefix="/api", tags=["parse"], dependencies=[Depends(require_invite_session)])
@@ -33,6 +35,7 @@ def parse_video(
     payload: ParseRequest,
     request: Request,
     parser: ParserService = Depends(get_parser_service),
+    preloader: PreloadService = Depends(get_preload_service),
     records: RecordService = Depends(get_record_service),
     limit: ConcurrencyLimit = Depends(parse_limit),
     settings: AppSettings = Depends(settings_dep),
@@ -52,6 +55,7 @@ def parse_video(
     records.append(
         url=payload.url, platform=platform, media_type=media_type, title=title, ip=get_client_ip(request, settings)
     )
+    preloader.schedule(payload.url, info)
 
     result = {
         "success": True,

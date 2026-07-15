@@ -38,6 +38,15 @@ class ResourceSettings(BaseModel):
     stream_read_timeout_seconds: int = 300
     max_redirects: int = 5
     preload_enabled: bool = False
+    metadata_cache_ttl_seconds: int = 600
+    metadata_cache_max_entries: int = 500
+    preload_platforms: list[str] = Field(default_factory=lambda: ["douyin"])
+    preload_max_duration_seconds: int = 180
+    preload_max_bytes: int = 100 * 1024 * 1024
+    preload_cache_max_bytes: int = 512 * 1024 * 1024
+    preload_cache_max_entries: int = 20
+    preload_concurrency: int = 1
+    preload_wait_seconds: float = 2.0
     f2_prewarm_enabled: bool = True
 
 
@@ -119,6 +128,14 @@ def _apply_env(data: dict[str, Any]) -> dict[str, Any]:
         "DOUYIN_TRUST_PROXY_HEADERS": (security, "trust_proxy_headers"),
         "DOUYIN_SECURE_COOKIES": (security, "secure_cookies"),
         "DOUYIN_PRELOAD_ENABLED": (resources, "preload_enabled"),
+        "DOUYIN_METADATA_CACHE_TTL_SECONDS": (resources, "metadata_cache_ttl_seconds"),
+        "DOUYIN_METADATA_CACHE_MAX_ENTRIES": (resources, "metadata_cache_max_entries"),
+        "DOUYIN_PRELOAD_MAX_DURATION_SECONDS": (resources, "preload_max_duration_seconds"),
+        "DOUYIN_PRELOAD_MAX_BYTES": (resources, "preload_max_bytes"),
+        "DOUYIN_PRELOAD_CACHE_MAX_BYTES": (resources, "preload_cache_max_bytes"),
+        "DOUYIN_PRELOAD_CACHE_MAX_ENTRIES": (resources, "preload_cache_max_entries"),
+        "DOUYIN_PRELOAD_CONCURRENCY": (resources, "preload_concurrency"),
+        "DOUYIN_PRELOAD_WAIT_SECONDS": (resources, "preload_wait_seconds"),
         "DOUYIN_F2_PREWARM_ENABLED": (resources, "f2_prewarm_enabled"),
         "DOUYIN_MAX_STREAM_BYTES": (resources, "max_stream_bytes"),
         "DOUYIN_MAX_DOWNLOAD_BYTES": (resources, "max_download_bytes"),
@@ -134,8 +151,21 @@ def _apply_env(data: dict[str, Any]) -> dict[str, Any]:
             raw = os.environ[env_name]
             if raw.lower() in {"true", "false"}:
                 target[key] = raw.lower() == "true"
-            elif key in {"port", "max_stream_bytes", "max_download_bytes"}:
+            elif key in {
+                "port",
+                "max_stream_bytes",
+                "max_download_bytes",
+                "metadata_cache_ttl_seconds",
+                "metadata_cache_max_entries",
+                "preload_max_duration_seconds",
+                "preload_max_bytes",
+                "preload_cache_max_bytes",
+                "preload_cache_max_entries",
+                "preload_concurrency",
+            }:
                 target[key] = int(raw)
+            elif key == "preload_wait_seconds":
+                target[key] = float(raw)
             else:
                 target[key] = raw
 
@@ -143,6 +173,8 @@ def _apply_env(data: dict[str, Any]) -> dict[str, Any]:
         security["invite_codes"] = _split_csv(os.environ["DOUYIN_INVITE_CODES"])
     if "DOUYIN_CORS_ORIGINS" in os.environ:
         data["cors_origins"] = _split_csv(os.environ["DOUYIN_CORS_ORIGINS"])
+    if "DOUYIN_PRELOAD_PLATFORMS" in os.environ:
+        resources["preload_platforms"] = _split_csv(os.environ["DOUYIN_PRELOAD_PLATFORMS"])
     if "DOUYIN_TRUSTED_PROXY_CIDRS" in os.environ:
         security["trusted_proxy_cidrs"] = _split_csv(os.environ["DOUYIN_TRUSTED_PROXY_CIDRS"])
 

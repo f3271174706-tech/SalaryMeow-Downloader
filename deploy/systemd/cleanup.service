@@ -1,0 +1,15 @@
+[Unit]
+Description=Remove stale Douyin Downloader temporary files
+
+[Service]
+Type=oneshot
+User=douyin
+Group=douyin
+EnvironmentFile=/etc/douyin-downloader-refactor/app.env
+Environment=DOUYIN_CLEANUP_MAX_AGE_MINUTES=15
+ExecStart=/opt/douyin-downloader-refactor/scripts/cleanup_downloads.sh
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/douyin-downloader

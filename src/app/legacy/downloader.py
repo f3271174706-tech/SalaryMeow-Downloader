@@ -647,7 +647,8 @@ def _extract_tiktok(url: str) -> dict:
         # 先解析短链接
         r_resolve = safe_get(url, headers={"User-Agent": MOBILE_UA},
                              timeout=15,
-                             proxy=proxy_url)
+                             proxy=proxy_url,
+                             resolve_dns=False)
         full_url = str(r_resolve.url)
 
         # 获取 TikTok 页面
@@ -688,7 +689,8 @@ def _extract_tiktok(url: str) -> dict:
 
     # Step 3: Get download link from preview page
     r2 = safe_get(f"https://ssstiktok.cc{preview_path}",
-                  headers={"User-Agent": MOBILE_UA}, timeout=30, proxy=proxy_url)
+                  headers={"User-Agent": MOBILE_UA}, timeout=30, proxy=proxy_url,
+                  resolve_dns=False)
     if r2.status_code != 200:
         raise ValueError(f"ssstiktok 预览页返回 {r2.status_code}")
 
@@ -724,6 +726,7 @@ def _resolve_twitter_url(url: str) -> str:
             headers={"User-Agent": MOBILE_UA},
             timeout=15,
             proxy=config.get("network.proxy", "") or None,
+            resolve_dns=False,
         )
         return str(r.url)
     return url

@@ -1,0 +1,12 @@
+[Unit]
+Description=Check and recover Douyin Downloader services
+After=network-online.target
+
+[Service]
+Type=oneshot
+Environment=DOUYIN_SERVICE_NAME=douyin-downloader-refactor.service
+Environment=DOUYIN_HEALTH_URL=http://127.0.0.1:9000/health/live
+ExecStart=/opt/douyin-downloader-refactor/scripts/healthcheck.sh
+NoNewPrivileges=true
+ProtectHome=true
+ProtectSystem=strict

@@ -23,20 +23,31 @@ class StreamService:
             return self.settings.network.proxy or None
         return None
 
+    @staticmethod
+    def _headers_for_platform(platform: str) -> dict[str, str]:
+        headers = {"User-Agent": MOBILE_UA}
+        if platform == "douyin":
+            headers["Referer"] = "https://www.douyin.com/"
+        elif platform == "bilibili":
+            headers["Referer"] = "https://www.bilibili.com/"
+        elif platform == "kuaishou":
+            headers["Referer"] = "https://www.kuaishou.com/"
+        return headers
+
     async def stream(self, request: Request, video_url: str, quality: str = "1080p") -> StreamingResponse:
         try:
-            safe = validate_url(video_url)
+            candidate = validate_url(video_url, resolve_dns=False)
+            safe = validate_url(
+                candidate.normalized,
+                resolve_dns=self._proxy_for_platform(candidate.platform) is None,
+            )
         except UrlSafetyError as exc:
             raise HTTPException(status_code=400, detail="媒体地址不安全") from exc
         target = safe.normalized
         if safe.platform == "douyin":
             target = apply_quality(target, quality)
 
-        headers = {"User-Agent": MOBILE_UA}
-        if safe.platform == "bilibili":
-            headers["Referer"] = "https://www.bilibili.com/"
-        elif safe.platform == "kuaishou":
-            headers["Referer"] = "https://www.kuaishou.com/"
+        headers = self._headers_for_platform(safe.platform)
         range_header = request.headers.get("range")
         if range_header:
             if not re.fullmatch(r"bytes=\d*-\d*", range_header.strip(), flags=re.IGNORECASE):
@@ -76,7 +87,9 @@ class StreamService:
                     if not location:
                         raise HTTPException(status_code=502, detail="上游重定向缺少 Location")
                     safe_redirect = validate_url(
-                        str(httpx.URL(current_url).join(location)), platform=safe.platform
+                        str(httpx.URL(current_url).join(location)),
+                        platform=safe.platform,
+                        resolve_dns=self._proxy_for_platform(safe.platform) is None,
                     )
                     current_url = safe_redirect.normalized
                     continue

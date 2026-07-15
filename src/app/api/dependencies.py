@@ -12,6 +12,7 @@ from app.infrastructure.rate_limit import AsyncConcurrencyLimit, ConcurrencyLimi
 from app.services.auth_service import AuthService
 from app.services.download_service import DownloadService
 from app.services.parser_service import ParserService
+from app.services.preload_service import PreloadService
 from app.services.record_service import RecordService
 from app.services.stream_service import StreamService
 
@@ -28,7 +29,7 @@ def get_record_service() -> RecordService:
 
 @lru_cache(maxsize=1)
 def get_parser_service() -> ParserService:
-    return ParserService()
+    return ParserService(get_settings())
 
 
 @lru_cache(maxsize=1)
@@ -39,6 +40,11 @@ def get_download_service() -> DownloadService:
 @lru_cache(maxsize=1)
 def get_stream_service() -> StreamService:
     return StreamService(get_settings())
+
+
+@lru_cache(maxsize=1)
+def get_preload_service() -> PreloadService:
+    return PreloadService(get_settings())
 
 
 @lru_cache(maxsize=1)

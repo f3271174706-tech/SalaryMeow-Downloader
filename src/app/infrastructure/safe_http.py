@@ -10,10 +10,10 @@ import httpx
 from .url_safety import validate_url
 
 
-def safe_get(url: str, *, max_redirects: int = 5, **kwargs) -> httpx.Response:
+def safe_get(url: str, *, max_redirects: int = 5, resolve_dns: bool = True, **kwargs) -> httpx.Response:
     kwargs.pop("follow_redirects", None)
     kwargs.setdefault("trust_env", False)
-    current = validate_url(url).normalized
+    current = validate_url(url, resolve_dns=resolve_dns).normalized
     for redirect_count in range(max_redirects + 1):
         response = httpx.get(current, follow_redirects=False, **kwargs)
         if not response.is_redirect:
@@ -24,16 +24,16 @@ def safe_get(url: str, *, max_redirects: int = 5, **kwargs) -> httpx.Response:
             raise httpx.HTTPError("Redirect response is missing Location")
         if redirect_count >= max_redirects:
             raise httpx.TooManyRedirects("Too many redirects")
-        current = validate_url(str(httpx.URL(current).join(location))).normalized
+        current = validate_url(str(httpx.URL(current).join(location)), resolve_dns=resolve_dns).normalized
     raise httpx.TooManyRedirects("Too many redirects")
 
 
 @contextmanager
-def safe_stream(url: str, *, max_redirects: int = 5, **kwargs) -> Iterator[httpx.Response]:
+def safe_stream(url: str, *, max_redirects: int = 5, resolve_dns: bool = True, **kwargs) -> Iterator[httpx.Response]:
     kwargs.pop("follow_redirects", None)
     kwargs.setdefault("trust_env", False)
     headers = kwargs.pop("headers", None)
-    current = validate_url(url).normalized
+    current = validate_url(url, resolve_dns=resolve_dns).normalized
     client = httpx.Client(follow_redirects=False, **kwargs)
     response: httpx.Response | None = None
     try:
@@ -49,7 +49,7 @@ def safe_stream(url: str, *, max_redirects: int = 5, **kwargs) -> Iterator[httpx
                 raise httpx.HTTPError("Redirect response is missing Location")
             if redirect_count >= max_redirects:
                 raise httpx.TooManyRedirects("Too many redirects")
-            current = validate_url(str(httpx.URL(current).join(location))).normalized
+            current = validate_url(str(httpx.URL(current).join(location)), resolve_dns=resolve_dns).normalized
         raise httpx.TooManyRedirects("Too many redirects")
     finally:
         if response is not None:

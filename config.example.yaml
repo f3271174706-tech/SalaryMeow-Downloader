@@ -24,7 +24,19 @@ resources:
   request_timeout_seconds: 30
   stream_read_timeout_seconds: 300
   max_redirects: 5
-  preload_enabled: false
+  # Cache successful parse metadata for 10 minutes.
+  metadata_cache_ttl_seconds: 600
+  metadata_cache_max_entries: 500
+  # Smart preload only downloads small ordinary videos in the background.
+  preload_enabled: true
+  preload_platforms:
+    - douyin
+  preload_max_duration_seconds: 180
+  preload_max_bytes: 104857600
+  preload_cache_max_bytes: 536870912
+  preload_cache_max_entries: 20
+  preload_concurrency: 1
+  preload_wait_seconds: 2.0
   f2_prewarm_enabled: true
 api:
   enabled: true

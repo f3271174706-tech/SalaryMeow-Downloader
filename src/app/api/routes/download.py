@@ -4,15 +4,18 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
+from starlette.background import BackgroundTask
 
-from app.api.dependencies import download_limit, get_download_service, require_invite_session
+from app.api.dependencies import download_limit, get_download_service, get_preload_service, require_invite_session
 from app.infrastructure.rate_limit import ConcurrencyLimit, ConcurrencyLimitExceeded
 from app.services.download_service import DownloadService, DownloadTooLargeError, InsufficientStorageError
+from app.services.preload_service import PreloadService
 
 router = APIRouter(prefix="/api", tags=["download"], dependencies=[Depends(require_invite_session)])
 logger = logging.getLogger(__name__)
@@ -31,18 +34,25 @@ class DownloadRequest(BaseModel):
 def download_video_api(
     payload: DownloadRequest,
     service: DownloadService = Depends(get_download_service),
+    preloader: PreloadService = Depends(get_preload_service),
     limit: ConcurrencyLimit = Depends(download_limit),
 ) -> FileResponse:
     try:
         with limit.hold():
-            file_path, filename = service.download(
-                url=payload.url,
-                quality=payload.quality,
-                media_type=payload.type,
-                image_index=payload.image_index,
-                live_photo_format=payload.live_photo_format,
-                live_photo_index=payload.live_photo_index,
-            )
+            preloaded = None
+            if payload.type == "video" and not payload.live_photo_format:
+                preloaded = preloader.consume(payload.url, payload.quality)
+            if preloaded is not None:
+                file_path, filename = preloaded
+            else:
+                file_path, filename = service.download(
+                    url=payload.url,
+                    quality=payload.quality,
+                    media_type=payload.type,
+                    image_index=payload.image_index,
+                    live_photo_format=payload.live_photo_format,
+                    live_photo_index=payload.live_photo_index,
+                )
     except ConcurrencyLimitExceeded as exc:
         raise HTTPException(status_code=429, detail=str(exc)) from exc
     except DownloadTooLargeError as exc:
@@ -65,6 +75,7 @@ def download_video_api(
 
     return FileResponse(
         path=file_path,
+        background=BackgroundTask(lambda: Path(file_path).unlink(missing_ok=True)),
         media_type=media_type,
         filename=filename,
         headers={

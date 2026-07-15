@@ -11,7 +11,16 @@
 - `ADMIN_PASS`：管理员密码；缺失时管理模块禁用。
 - `DOUYIN_TRUST_PROXY_HEADERS`：是否信任代理头，默认 `false`。
 - `DOUYIN_TRUSTED_PROXY_CIDRS`：可信代理 CIDR，启用代理头时建议配置。
-- `DOUYIN_PRELOAD_ENABLED`：预下载开关，默认 `false`。
+- `DOUYIN_METADATA_CACHE_TTL_SECONDS`：元数据缓存秒数，默认 `600`。
+- `DOUYIN_METADATA_CACHE_MAX_ENTRIES`：元数据缓存条目上限，默认 `500`。
+- `DOUYIN_PRELOAD_ENABLED`：受限智能预下载开关，默认 `false`。
+- `DOUYIN_PRELOAD_PLATFORMS`：允许预下载的平台，默认仅 `douyin`。
+- `DOUYIN_PRELOAD_MAX_DURATION_SECONDS`：视频时长上限，默认 `180` 秒。
+- `DOUYIN_PRELOAD_MAX_BYTES`：单个预下载文件上限，默认 100 MiB。
+- `DOUYIN_PRELOAD_CACHE_MAX_BYTES`：预下载缓存总上限，默认 512 MiB。
+- `DOUYIN_PRELOAD_CACHE_MAX_ENTRIES`：预下载缓存条目上限，默认 `20`。
+- `DOUYIN_PRELOAD_CONCURRENCY`：后台预下载并发，默认 `1`。
+- `DOUYIN_PRELOAD_WAIT_SECONDS`：下载请求等待进行中预下载的最长时间，默认 `2` 秒。
 - `DOUYIN_DATA_DIR`、`DOUYIN_DOWNLOADS_DIR`、`DOUYIN_LOGS_DIR`：数据、下载和日志目录。
 - `DOUYIN_SECURE_COOKIES`：本地 HTTP 开发设为 `false`，生产 HTTPS 必须为 `true`。
 - `DOUYIN_MAX_DOWNLOAD_BYTES`、`DOUYIN_MAX_STREAM_BYTES`：单次下载和流式响应的最大字节数。
@@ -25,3 +34,5 @@
 Cookie 配置：
 
 真实平台 Cookie 仍由旧兼容层读取，可放入不入库的 `config.yaml` 或后续迁移到环境变量/外部 secrets 文件。配置对象 repr 已脱敏。
+
+智能预下载只处理普通视频，并要求时长已知。缓存文件被用户下载后立即删除；未使用文件由 10 分钟进程内过期机制和服务器定时清理共同回收。
