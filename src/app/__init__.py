@@ -1,0 +1,1 @@
+"""Refactored FastAPI application package."""

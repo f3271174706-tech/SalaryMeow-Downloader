@@ -1,0 +1,24 @@
+[Unit]
+Description=Douyin Downloader Refactored
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=douyin
+Group=douyin
+WorkingDirectory=/opt/douyin-downloader-refactor
+EnvironmentFile=/etc/douyin-downloader-refactor/app.env
+ExecStart=/opt/douyin-downloader-refactor/.venv/bin/python -m uvicorn app.main:app --app-dir src --host 127.0.0.1 --port 9000 --workers 1
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/douyin-downloader /var/log/douyin-downloader
+
+[Install]
+WantedBy=multi-user.target

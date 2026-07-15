@@ -1,0 +1,42 @@
+title: Douyin Downloader Refactored
+host: 127.0.0.1
+port: 9000
+cors_origins:
+  - http://127.0.0.1:9000
+  - http://localhost:9000
+security:
+  app_env: development
+  session_secret: replace-with-at-least-32-random-characters
+  invite_codes:
+    - change-me-invite-code
+  admin_user: admin
+  admin_password: change-me-admin-password
+  trust_proxy_headers: false
+  trusted_proxy_cidrs: []
+  secure_cookies: false
+resources:
+  parse_concurrency: 4
+  download_concurrency: 2
+  stream_concurrency: 8
+  max_request_url_length: 4096
+  max_stream_bytes: 1073741824
+  max_download_bytes: 1073741824
+  request_timeout_seconds: 30
+  stream_read_timeout_seconds: 300
+  max_redirects: 5
+  preload_enabled: false
+  f2_prewarm_enabled: true
+api:
+  enabled: true
+  timeout: 15
+  fallback_to_crawler: false
+cookies:
+  # Copy one or more current Douyin web cookies into the private config.yaml.
+  douyin: []
+network:
+  # Optional HTTP proxy used only by TikTok and X/Twitter.
+  proxy: ""
+paths:
+  data_dir: var
+  downloads_dir: var/downloads
+  logs_dir: var/logs

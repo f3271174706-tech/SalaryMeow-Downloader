@@ -1,0 +1,41 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local runtime data
+var/
+downloads/
+preloads/
+logs/
+*.log
+*.jsonl
+*.bak
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+config.yaml
+DEPLOY.md
+cloudflared/
+*.pem
+*.key
+id_ed25519*
+
+# Node / Playwright local caches
+node_modules/
+npm-cache/
+playwright-report/
+test-results/
+
+# IDE / local assistants
+.vscode/
+.idea/
+.claude/
+.codex/
