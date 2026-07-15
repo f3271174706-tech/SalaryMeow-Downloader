@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.api.dependencies import (
@@ -34,6 +34,7 @@ class ParseRequest(BaseModel):
 def parse_video(
     payload: ParseRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
     parser: ParserService = Depends(get_parser_service),
     preloader: PreloadService = Depends(get_preload_service),
     records: RecordService = Depends(get_record_service),
@@ -52,8 +53,13 @@ def parse_video(
     media_type = info.get("type", "video")
     platform = info.get("platform", "unknown")
     title = info.get("title", "")
-    records.append(
-        url=payload.url, platform=platform, media_type=media_type, title=title, ip=get_client_ip(request, settings)
+    background_tasks.add_task(
+        records.append,
+        url=payload.url,
+        platform=platform,
+        media_type=media_type,
+        title=title,
+        ip=get_client_ip(request, settings),
     )
     preloader.schedule(payload.url, info)
 
