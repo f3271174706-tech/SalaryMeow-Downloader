@@ -181,6 +181,9 @@ python -m mypy src
 
 ## 生产部署
 
+当前生产环境的域名、端口、服务、Cookie 轮换、发布、故障处理和回滚流程见
+[生产交接文档](docs/HANDOVER.md)。
+
 仓库提供单 worker 的 systemd 示例：
 
 ```bash
