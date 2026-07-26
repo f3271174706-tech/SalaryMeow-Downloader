@@ -87,6 +87,16 @@ def test_admin_pages_can_redirect_to_shared_dashboard(monkeypatch) -> None:
     assert response.headers["location"] == "https://legacy.example.com/admin"
 
 
+def test_admin_page_and_assets_use_separate_cache_policies(monkeypatch) -> None:
+    client = _client(monkeypatch)
+
+    page = client.get("/admin")
+    asset = client.get("/admin-assets/spatial-background-mobile.webp")
+
+    assert page.headers["cache-control"] == "no-cache"
+    assert "max-age=2592000" in asset.headers["cache-control"]
+
+
 def test_admin_uses_hashed_password_and_strict_session_cookie(monkeypatch) -> None:
     client = _client(monkeypatch, admin_password="a-strong-admin-password")
 

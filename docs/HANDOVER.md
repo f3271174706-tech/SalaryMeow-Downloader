@@ -13,6 +13,7 @@ GitHub：<https://github.com/f3271174706-tech/SalaryMeow-Downloader>
 - 旧项目、旧 systemd unit 和旧隧道配置仍保留，但都处于停止、禁用状态。
 - 旧项目的最终 627 条解析记录已迁移到新项目；新项目此后继续写入同一份新文件。
 - Admin 登录页使用 FZP 液态玻璃外壳；登录后保留旧项目的浅色统计、筛选和记录表格布局。
+- 登录背景使用桌面/移动端 WebP 响应式资源；移动端跳过 WebGL 依赖，并将记录改为每页 20 条的卡片布局。
 - Admin 使用 scrypt 密码哈希、HMAC-SHA256 签名会话和 Strict/Secure/HttpOnly Cookie。
 
 ## 2. 生产拓扑

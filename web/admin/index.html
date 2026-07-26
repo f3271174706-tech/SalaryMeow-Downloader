@@ -7,13 +7,26 @@
     <meta name="theme-color" content="#294f7e" />
     <title>FZP Console</title>
     <link rel="icon" href="data:," />
+    <link
+      rel="preload"
+      as="image"
+      href="/admin-assets/spatial-background-mobile.webp"
+      type="image/webp"
+      media="(max-width: 768px)"
+      fetchpriority="high"
+    />
+    <link
+      rel="preload"
+      as="image"
+      href="/admin-assets/spatial-background.webp"
+      type="image/webp"
+      media="(min-width: 769px)"
+      fetchpriority="high"
+    />
     <link rel="stylesheet" href="/admin-assets/design-system/shared/foundations.css" />
     <link rel="stylesheet" href="/admin-assets/design-system/spatial-liquid/spatial-liquid.css" />
-    <link rel="stylesheet" href="/admin-assets/styles.css?v=20260726-legacy" />
-    <script src="/admin-assets/design-system/spatial-liquid/vendor/html2canvas.min.js" defer></script>
-    <script src="/admin-assets/design-system/spatial-liquid/vendor/liquidGL.js" defer></script>
-    <script src="/admin-assets/app.js?v=20260726-legacy" defer></script>
-    <script src="/admin-assets/specular-button.js" type="module"></script>
+    <link rel="stylesheet" href="/admin-assets/styles.css?v=20260726-mobile" />
+    <script src="/admin-assets/app.js?v=20260726-mobile" defer></script>
   </head>
   <body class="fzp-root fzp-spatial">
     <div class="fzp-spatial-background" aria-hidden="true"></div>
@@ -130,6 +143,11 @@
               <tbody id="recordRows"></tbody>
             </table>
           </div>
+          <footer class="legacy-pagination">
+            <button id="previousPage" type="button">上一页</button>
+            <span id="pageStatus">第 1 页</span>
+            <button id="nextPage" type="button">下一页</button>
+          </footer>
         </div>
       </section>
     </main>

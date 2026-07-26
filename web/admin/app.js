@@ -18,11 +18,34 @@ const elements = {
   recordSearch: document.querySelector("#recordSearch"),
   recordsMessage: document.querySelector("#recordsMessage"),
   recordRows: document.querySelector("#recordRows"),
+  previousPage: document.querySelector("#previousPage"),
+  nextPage: document.querySelector("#nextPage"),
+  pageStatus: document.querySelector("#pageStatus"),
 };
 
 let spatialModulePromise;
 let records = [];
 let refreshTimer;
+let currentPage = 1;
+
+function loadScript(source) {
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${source}"]`);
+    if (existing) {
+      if (existing.dataset.loaded === "true") resolve();
+      else existing.addEventListener("load", resolve, { once: true });
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = source;
+    script.addEventListener("load", () => {
+      script.dataset.loaded = "true";
+      resolve();
+    }, { once: true });
+    script.addEventListener("error", reject, { once: true });
+    document.head.append(script);
+  });
+}
 
 function addCssLiquidLayer(panel) {
   panel.classList.add("fzp-spatial-panel");
@@ -37,7 +60,20 @@ async function enhanceLogin() {
   const panel = elements.loginView;
   if (!panel || panel.dataset.fzpSpatialReady === "true") return;
   panel.dataset.fzpSpatialReady = "true";
+  const desktopEffects = window.matchMedia(
+    "(min-width: 769px) and (prefers-reduced-motion: no-preference)",
+  ).matches;
+  if (!desktopEffects) {
+    addCssLiquidLayer(panel);
+    panel.dataset.fzpWebgl = "fallback";
+    panel.dataset.fzpWebglReason = "mobile-performance-policy";
+    return;
+  }
   try {
+    await Promise.all([
+      loadScript("/admin-assets/design-system/spatial-liquid/vendor/html2canvas.min.js"),
+      loadScript("/admin-assets/design-system/spatial-liquid/vendor/liquidGL.js"),
+    ]);
     spatialModulePromise ||= import("/admin-assets/design-system/spatial-liquid/spatial-liquid.js");
     const { initSpatialLiquid } = await spatialModulePromise;
     const spatial = initSpatialLiquid({
@@ -55,7 +91,10 @@ async function enhanceLogin() {
       tiltFactor: 2,
       reveal: "fade",
     });
-    await spatial.ready;
+    await Promise.all([
+      spatial.ready,
+      import("/admin-assets/specular-button.js"),
+    ]);
   } catch {
     addCssLiquidLayer(panel);
     panel.dataset.fzpWebgl = "fallback";
@@ -126,9 +165,10 @@ function renderStats() {
   );
 }
 
-function appendCell(row, value, className = "") {
+function appendCell(row, value, className = "", label = "") {
   const cell = document.createElement("td");
   if (className) cell.className = className;
+  if (label) cell.dataset.label = label;
   cell.textContent = String(value ?? "");
   row.append(cell);
   return cell;
@@ -156,13 +196,21 @@ function renderRecords() {
     cell.colSpan = 6;
     elements.recordRows.replaceChildren(row);
     elements.recordsMessage.textContent = "";
+    elements.pageStatus.textContent = "第 1 / 1 页";
+    elements.previousPage.disabled = true;
+    elements.nextPage.disabled = true;
     return;
   }
+  const pageSize = window.matchMedia("(max-width: 768px)").matches ? 20 : 50;
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  currentPage = Math.min(Math.max(1, currentPage), pageCount);
+  const start = (currentPage - 1) * pageSize;
+  const visible = filtered.slice(start, start + pageSize);
   elements.recordRows.replaceChildren(
-    ...filtered.map((item) => {
+    ...visible.map((item) => {
       const row = document.createElement("tr");
-      appendCell(row, displayTime(item), "legacy-time");
-      const ipCell = appendCell(row, item.ip || "-", "legacy-ip");
+      appendCell(row, displayTime(item), "legacy-time", "时间");
+      const ipCell = appendCell(row, item.ip || "-", "legacy-ip", "IP / 地址");
       if (item.location) {
         const location = document.createElement("small");
         location.className = "legacy-location";
@@ -170,20 +218,23 @@ function renderRecords() {
         ipCell.append(document.createElement("br"), location);
       }
       const platformCell = document.createElement("td");
+      platformCell.dataset.label = "平台";
       const platformBadge = document.createElement("span");
       platformBadge.className = `legacy-platform legacy-platform--${item.platform || "unknown"}`;
       platformBadge.textContent = item.platform || "-";
       platformCell.append(platformBadge);
       row.append(platformCell);
       const typeCell = document.createElement("td");
+      typeCell.dataset.label = "类型";
       const typeBadge = document.createElement("span");
       typeBadge.className = "legacy-type";
       typeBadge.textContent = { video: "视频", photo: "图片", live_photo: "动图" }[item.type] || item.type || "-";
       typeCell.append(typeBadge);
       row.append(typeCell);
-      const titleCell = appendCell(row, item.title || "-", "legacy-title");
+      const titleCell = appendCell(row, item.title || "-", "legacy-title", "标题");
       titleCell.title = item.title || "";
       const linkCell = document.createElement("td");
+      linkCell.dataset.label = "链接";
       const copyButton = document.createElement("button");
       copyButton.className = "legacy-copy";
       copyButton.type = "button";
@@ -202,6 +253,9 @@ function renderRecords() {
     }),
   );
   elements.recordsMessage.textContent = filtered.length === records.length ? "" : `匹配 ${filtered.length} 条记录`;
+  elements.pageStatus.textContent = `第 ${currentPage} / ${pageCount} 页`;
+  elements.previousPage.disabled = currentPage <= 1;
+  elements.nextPage.disabled = currentPage >= pageCount;
 }
 
 async function loadRecords() {
@@ -276,8 +330,23 @@ elements.logoutButton.addEventListener("click", async () => {
 });
 
 for (const input of [elements.platformFilter, elements.typeFilter, elements.recordSearch]) {
-  input.addEventListener(input === elements.recordSearch ? "input" : "change", renderRecords);
+  input.addEventListener(input === elements.recordSearch ? "input" : "change", () => {
+    currentPage = 1;
+    renderRecords();
+  });
 }
+elements.previousPage.addEventListener("click", () => {
+  currentPage -= 1;
+  renderRecords();
+});
+elements.nextPage.addEventListener("click", () => {
+  currentPage += 1;
+  renderRecords();
+});
+window.matchMedia("(max-width: 768px)").addEventListener("change", () => {
+  currentPage = 1;
+  renderRecords();
+});
 
 async function boot() {
   try {
