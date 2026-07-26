@@ -927,6 +927,10 @@ body.is-admin {
   display: none;
 }
 
+.legacy-summary-filters {
+  display: none;
+}
+
 .legacy-records-message {
   min-height: 18px;
   margin: -8px 0 8px;
@@ -1154,6 +1158,15 @@ body.is-admin {
   .legacy-mobile-overview[aria-pressed="true"] {
     color: #fff;
     background: #315b8d;
+  }
+
+  .legacy-admin--summary .legacy-filters > :is(select, #recordSearch) {
+    display: none;
+  }
+
+  .legacy-admin--summary .legacy-summary-filters {
+    display: grid;
+    gap: 10px;
   }
 
   .legacy-table-wrapper {

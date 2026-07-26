@@ -16,6 +16,8 @@ const elements = {
   platformFilter: document.querySelector("#platformFilter"),
   typeFilter: document.querySelector("#typeFilter"),
   recordSearch: document.querySelector("#recordSearch"),
+  summaryTimeSearch: document.querySelector("#summaryTimeSearch"),
+  summaryAddressSearch: document.querySelector("#summaryAddressSearch"),
   mobileOverviewButton: document.querySelector("#mobileOverviewButton"),
   recordsMessage: document.querySelector("#recordsMessage"),
   recordRows: document.querySelector("#recordRows"),
@@ -184,14 +186,27 @@ function displayTime(item) {
 }
 
 function renderRecords() {
-  const platform = elements.platformFilter.value;
-  const type = elements.typeFilter.value;
-  const query = elements.recordSearch.value.trim().toLowerCase();
+  const summaryMode = elements.dashboardView.classList.contains("legacy-admin--summary");
+  const platform = summaryMode ? "" : elements.platformFilter.value;
+  const type = summaryMode ? "" : elements.typeFilter.value;
+  const query = summaryMode ? "" : elements.recordSearch.value.trim().toLowerCase();
+  const timeQuery = summaryMode ? elements.summaryTimeSearch.value.trim().toLowerCase() : "";
+  const addressQuery = summaryMode ? elements.summaryAddressSearch.value.trim().toLowerCase() : "";
   const filtered = records.filter((item) => {
     if (platform && item.platform !== platform) return false;
     if (type && item.type !== type) return false;
-    if (!query) return true;
-    return String(item.title ?? "").toLowerCase().includes(query);
+    if (query && !String(item.title ?? "").toLowerCase().includes(query)) return false;
+    if (
+      timeQuery
+      && ![item.timestamp, displayTime(item)]
+        .some((value) => String(value ?? "").toLowerCase().includes(timeQuery))
+    ) return false;
+    if (
+      addressQuery
+      && ![item.ip, item.location]
+        .some((value) => String(value ?? "").toLowerCase().includes(addressQuery))
+    ) return false;
+    return true;
   });
   if (!filtered.length) {
     const row = document.createElement("tr");
@@ -328,6 +343,8 @@ elements.logoutButton.addEventListener("click", async () => {
     elements.dashboardView.classList.remove("legacy-admin--summary");
     elements.mobileOverviewButton.setAttribute("aria-pressed", "false");
     elements.mobileOverviewButton.textContent = "总览";
+    elements.summaryTimeSearch.value = "";
+    elements.summaryAddressSearch.value = "";
     records = [];
     elements.password.value = "";
     elements.logoutButton.disabled = false;
@@ -337,6 +354,12 @@ elements.logoutButton.addEventListener("click", async () => {
 
 for (const input of [elements.platformFilter, elements.typeFilter, elements.recordSearch]) {
   input.addEventListener(input === elements.recordSearch ? "input" : "change", () => {
+    currentPage = 1;
+    renderRecords();
+  });
+}
+for (const input of [elements.summaryTimeSearch, elements.summaryAddressSearch]) {
+  input.addEventListener("input", () => {
     currentPage = 1;
     renderRecords();
   });
@@ -353,8 +376,16 @@ elements.mobileOverviewButton.addEventListener("click", () => {
   const enabled = elements.dashboardView.classList.toggle("legacy-admin--summary");
   elements.mobileOverviewButton.setAttribute("aria-pressed", String(enabled));
   elements.mobileOverviewButton.textContent = enabled ? "详细" : "总览";
+  currentPage = 1;
+  renderRecords();
+  if (enabled) elements.summaryTimeSearch.focus();
 });
 window.matchMedia("(max-width: 768px)").addEventListener("change", () => {
+  if (!window.matchMedia("(max-width: 768px)").matches) {
+    elements.dashboardView.classList.remove("legacy-admin--summary");
+    elements.mobileOverviewButton.setAttribute("aria-pressed", "false");
+    elements.mobileOverviewButton.textContent = "总览";
+  }
   currentPage = 1;
   renderRecords();
 });
