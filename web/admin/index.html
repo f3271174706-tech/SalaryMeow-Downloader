@@ -25,8 +25,8 @@
     />
     <link rel="stylesheet" href="/admin-assets/design-system/shared/foundations.css" />
     <link rel="stylesheet" href="/admin-assets/design-system/spatial-liquid/spatial-liquid.css" />
-    <link rel="stylesheet" href="/admin-assets/styles.css?v=20260726-mobile" />
-    <script src="/admin-assets/app.js?v=20260726-mobile" defer></script>
+    <link rel="stylesheet" href="/admin-assets/styles.css?v=20260726-overview" />
+    <script src="/admin-assets/app.js?v=20260726-overview" defer></script>
   </head>
   <body class="fzp-root fzp-spatial">
     <div class="fzp-spatial-background" aria-hidden="true"></div>
@@ -133,6 +133,9 @@
               <option value="live_photo">动图</option>
             </select>
             <input id="recordSearch" type="search" placeholder="搜索标题..." />
+            <button id="mobileOverviewButton" class="legacy-mobile-overview" type="button" aria-pressed="false">
+              总览
+            </button>
           </div>
           <p id="recordsMessage" class="legacy-records-message" aria-live="polite"></p>
           <div class="legacy-table-wrapper">

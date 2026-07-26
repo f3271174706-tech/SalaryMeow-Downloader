@@ -16,6 +16,7 @@ const elements = {
   platformFilter: document.querySelector("#platformFilter"),
   typeFilter: document.querySelector("#typeFilter"),
   recordSearch: document.querySelector("#recordSearch"),
+  mobileOverviewButton: document.querySelector("#mobileOverviewButton"),
   recordsMessage: document.querySelector("#recordsMessage"),
   recordRows: document.querySelector("#recordRows"),
   previousPage: document.querySelector("#previousPage"),
@@ -176,8 +177,10 @@ function appendCell(row, value, className = "", label = "") {
 
 function displayTime(item) {
   const value = item.timestamp || (item.ts ? new Date(item.ts * 1000).toLocaleString() : "");
-  const match = String(value).match(/\d{4}-(\d{2})-(\d{2}) (\d{2}):(\d{2})/);
-  return match ? `${match[1]}/${match[2]} ${match[3]}:${match[4]}` : value;
+  const match = String(value).match(/\d{4}[/-](\d{1,2})[/-](\d{1,2})\s+(\d{1,2}):(\d{2})/);
+  return match
+    ? `${match[1].padStart(2, "0")}/${match[2].padStart(2, "0")} ${match[3].padStart(2, "0")}:${match[4]}`
+    : value;
 }
 
 function renderRecords() {
@@ -322,6 +325,9 @@ elements.logoutButton.addEventListener("click", async () => {
     setView(false);
     elements.statsGrid.replaceChildren();
     elements.recordRows.replaceChildren();
+    elements.dashboardView.classList.remove("legacy-admin--summary");
+    elements.mobileOverviewButton.setAttribute("aria-pressed", "false");
+    elements.mobileOverviewButton.textContent = "总览";
     records = [];
     elements.password.value = "";
     elements.logoutButton.disabled = false;
@@ -342,6 +348,11 @@ elements.previousPage.addEventListener("click", () => {
 elements.nextPage.addEventListener("click", () => {
   currentPage += 1;
   renderRecords();
+});
+elements.mobileOverviewButton.addEventListener("click", () => {
+  const enabled = elements.dashboardView.classList.toggle("legacy-admin--summary");
+  elements.mobileOverviewButton.setAttribute("aria-pressed", String(enabled));
+  elements.mobileOverviewButton.textContent = enabled ? "详细" : "总览";
 });
 window.matchMedia("(max-width: 768px)").addEventListener("change", () => {
   currentPage = 1;

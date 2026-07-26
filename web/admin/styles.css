@@ -923,6 +923,10 @@ body.is-admin {
   flex: 1;
 }
 
+.legacy-mobile-overview {
+  display: none;
+}
+
 .legacy-records-message {
   min-height: 18px;
   margin: -8px 0 8px;
@@ -1135,6 +1139,23 @@ body.is-admin {
     min-width: 100%;
   }
 
+  .legacy-mobile-overview {
+    display: block;
+    min-height: 42px;
+    border: 1px solid rgba(49, 91, 141, 0.18);
+    border-radius: 12px;
+    color: #315b8d;
+    background: rgba(231, 240, 252, 0.86);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .legacy-mobile-overview[aria-pressed="true"] {
+    color: #fff;
+    background: #315b8d;
+  }
+
   .legacy-table-wrapper {
     overflow: visible;
     border: 0;
@@ -1206,6 +1227,31 @@ body.is-admin {
 
   .legacy-empty::before {
     content: none !important;
+  }
+
+  .legacy-admin--summary .legacy-table-wrapper tr {
+    display: grid;
+    grid-template-columns: minmax(118px, 0.8fr) minmax(0, 1.2fr);
+  }
+
+  .legacy-admin--summary .legacy-table-wrapper td {
+    display: block;
+    min-width: 0;
+    padding: 11px 12px;
+    border-top: 0;
+  }
+
+  .legacy-admin--summary .legacy-table-wrapper td:nth-child(n + 3) {
+    display: none;
+  }
+
+  .legacy-admin--summary .legacy-table-wrapper td::before {
+    display: block;
+    margin-bottom: 5px;
+  }
+
+  .legacy-admin--summary .legacy-location {
+    display: none;
   }
 
   .legacy-pagination {
