@@ -1250,10 +1250,6 @@ body.is-admin {
     margin-bottom: 5px;
   }
 
-  .legacy-admin--summary .legacy-location {
-    display: none;
-  }
-
   .legacy-pagination {
     justify-content: center;
     padding-bottom: env(safe-area-inset-bottom);
