@@ -16,6 +16,7 @@ logs/
 *.log
 *.jsonl
 *.bak
+*.bak.*
 
 # Secrets and local config
 .env
