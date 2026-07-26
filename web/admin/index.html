@@ -96,65 +96,40 @@
         </footer>
       </section>
 
-      <section id="dashboardView" class="fzp-dashboard" aria-labelledby="dashboardTitle" data-fzp-liquid hidden>
-        <header class="fzp-dashboard__header">
-          <div class="fzp-brand">
-            <span class="fzp-mark" aria-hidden="true">
-              <svg viewBox="0 0 32 32"><path d="M8 8.5h16M8 16h11M8 23.5h16" /><circle cx="23" cy="16" r="2.5" /></svg>
-            </span>
-            <span id="dashboardBrandName">FZP Console</span>
+      <section id="dashboardView" class="legacy-admin" aria-labelledby="dashboardTitle" hidden>
+        <div class="legacy-admin__ambient" aria-hidden="true"></div>
+        <div class="legacy-admin__container">
+          <header class="legacy-admin__header">
+            <h1 id="dashboardTitle">解析记录</h1>
+            <button id="logoutButton" class="legacy-admin__logout" type="button">登出</button>
+          </header>
+          <div id="statsGrid" class="legacy-stats" aria-live="polite"></div>
+          <div class="legacy-filters">
+            <select id="platformFilter">
+              <option value="">全部平台</option>
+              <option value="douyin">抖音</option>
+              <option value="tiktok">TikTok</option>
+              <option value="twitter">Twitter</option>
+              <option value="bilibili">B站</option>
+              <option value="kuaishou">快手</option>
+            </select>
+            <select id="typeFilter">
+              <option value="">全部类型</option>
+              <option value="video">视频</option>
+              <option value="photo">图片</option>
+              <option value="live_photo">动图</option>
+            </select>
+            <input id="recordSearch" type="search" placeholder="搜索标题..." />
           </div>
-          <div class="fzp-user">
-            <span id="userAvatar" class="fzp-avatar">A</span>
-            <span id="currentUser">admin</span>
-            <button id="logoutButton" class="fzp-button fzp-button--quiet" type="button">退出</button>
+          <p id="recordsMessage" class="legacy-records-message" aria-live="polite"></p>
+          <div class="legacy-table-wrapper">
+            <table>
+              <thead>
+                <tr><th>时间</th><th>IP / 地址</th><th>平台</th><th>类型</th><th>标题</th><th>链接</th></tr>
+              </thead>
+              <tbody id="recordRows"></tbody>
+            </table>
           </div>
-        </header>
-
-        <div class="fzp-dashboard__body">
-          <p class="fzp-eyebrow">ADMIN WORKSPACE</p>
-          <h1 id="dashboardTitle">管理工作台</h1>
-          <p id="dashboardGreeting" class="fzp-lead">身份验证完成。</p>
-
-          <div id="statsGrid" class="fzp-stats" aria-live="polite"></div>
-
-          <section class="fzp-records fzp-surface" aria-labelledby="recordsTitle">
-            <header class="fzp-records__header">
-              <div>
-                <p class="fzp-eyebrow">PARSE RECORDS</p>
-                <h2 id="recordsTitle">解析记录</h2>
-              </div>
-              <button id="refreshButton" class="fzp-button fzp-button--quiet" type="button">刷新</button>
-            </header>
-            <div class="fzp-filters">
-              <label>
-                <span>平台</span>
-                <select id="platformFilter"><option value="">全部平台</option></select>
-              </label>
-              <label>
-                <span>媒体类型</span>
-                <select id="typeFilter"><option value="">全部类型</option></select>
-              </label>
-              <label class="fzp-filter-search">
-                <span>搜索</span>
-                <input id="recordSearch" type="search" placeholder="标题、IP、地区或链接" />
-              </label>
-            </div>
-            <p id="recordsMessage" class="fzp-records__message" aria-live="polite"></p>
-            <div class="fzp-table-wrap">
-              <table>
-                <thead>
-                  <tr><th>时间</th><th>平台</th><th>类型</th><th>标题</th><th>IP / 地区</th><th>来源</th></tr>
-                </thead>
-                <tbody id="recordRows"></tbody>
-              </table>
-            </div>
-            <footer class="fzp-pagination">
-              <button id="previousPage" class="fzp-button fzp-button--quiet" type="button">上一页</button>
-              <span id="pageStatus">第 1 页</span>
-              <button id="nextPage" class="fzp-button fzp-button--quiet" type="button">下一页</button>
-            </footer>
-          </section>
         </div>
       </section>
     </main>

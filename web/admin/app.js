@@ -10,28 +10,19 @@ const elements = {
   submitButton: document.querySelector("#submitButton"),
   formMessage: document.querySelector("#formMessage"),
   brandName: document.querySelector("#brandName"),
-  dashboardBrandName: document.querySelector("#dashboardBrandName"),
   brandDescription: document.querySelector("#brandDescription"),
-  currentUser: document.querySelector("#currentUser"),
-  userAvatar: document.querySelector("#userAvatar"),
-  dashboardGreeting: document.querySelector("#dashboardGreeting"),
   statsGrid: document.querySelector("#statsGrid"),
   logoutButton: document.querySelector("#logoutButton"),
-  refreshButton: document.querySelector("#refreshButton"),
   platformFilter: document.querySelector("#platformFilter"),
   typeFilter: document.querySelector("#typeFilter"),
   recordSearch: document.querySelector("#recordSearch"),
   recordsMessage: document.querySelector("#recordsMessage"),
   recordRows: document.querySelector("#recordRows"),
-  previousPage: document.querySelector("#previousPage"),
-  nextPage: document.querySelector("#nextPage"),
-  pageStatus: document.querySelector("#pageStatus"),
 };
 
 let spatialModulePromise;
 let records = [];
-let currentPage = 1;
-const pageSize = 50;
+let refreshTimer;
 
 function addCssLiquidLayer(panel) {
   panel.classList.add("fzp-spatial-panel");
@@ -42,7 +33,8 @@ function addCssLiquidLayer(panel) {
   panel.prepend(layer);
 }
 
-async function enhanceSpatialPanel(panel) {
+async function enhanceLogin() {
+  const panel = elements.loginView;
   if (!panel || panel.dataset.fzpSpatialReady === "true") return;
   panel.dataset.fzpSpatialReady = "true";
   try {
@@ -67,7 +59,6 @@ async function enhanceSpatialPanel(panel) {
   } catch {
     addCssLiquidLayer(panel);
     panel.dataset.fzpWebgl = "fallback";
-    panel.dataset.fzpWebglReason = "design-system-unavailable";
   }
 }
 
@@ -90,8 +81,15 @@ async function api(path, options = {}) {
 function setView(isAuthenticated) {
   elements.loginView.hidden = isAuthenticated;
   elements.dashboardView.hidden = !isAuthenticated;
-  document.title = isAuthenticated ? `工作台 · ${elements.brandName.textContent}` : elements.brandName.textContent;
-  void enhanceSpatialPanel(isAuthenticated ? elements.dashboardView : elements.loginView);
+  document.body.classList.toggle("is-admin", isAuthenticated);
+  document.title = isAuthenticated ? "后台管理 - 解析记录" : elements.brandName.textContent;
+  if (isAuthenticated) {
+    window.clearInterval(refreshTimer);
+    refreshTimer = window.setInterval(loadRecords, 30000);
+  } else {
+    window.clearInterval(refreshTimer);
+    void enhanceLogin();
+  }
 }
 
 function setBusy(isBusy) {
@@ -99,18 +97,29 @@ function setBusy(isBusy) {
   elements.submitButton.querySelector(".fzp-button__label").textContent = isBusy ? "正在验证…" : "进入工作台";
 }
 
-function renderStats(stats) {
+function renderStats() {
+  const counts = records.reduce((result, item) => {
+    result[item.platform] = (result[item.platform] || 0) + 1;
+    return result;
+  }, {});
+  const stats = [
+    ["总解析", records.length],
+    ["抖音", counts.douyin || 0],
+    ["TikTok", counts.tiktok || 0],
+    ["Twitter", counts.twitter || 0],
+    ["B站", counts.bilibili || 0],
+    ["快手", counts.kuaishou || 0],
+  ];
   elements.statsGrid.replaceChildren(
-    ...stats.map((item) => {
+    ...stats.map(([labelText, valueText]) => {
       const card = document.createElement("article");
-      card.className = "fzp-stat";
-      card.dataset.tone = item.tone || "neutral";
+      card.className = "legacy-stat-card";
       const label = document.createElement("span");
-      label.className = "fzp-stat__label";
-      label.textContent = item.label;
+      label.className = "legacy-stat-card__label";
+      label.textContent = labelText;
       const value = document.createElement("strong");
-      value.className = "fzp-stat__value";
-      value.textContent = item.value;
+      value.className = "legacy-stat-card__value";
+      value.textContent = valueText;
       card.append(label, value);
       return card;
     }),
@@ -125,14 +134,10 @@ function appendCell(row, value, className = "") {
   return cell;
 }
 
-function fillFilter(select, values, label) {
-  const current = select.value;
-  const options = [new Option(label, "")];
-  for (const value of [...new Set(values.filter(Boolean))].sort()) {
-    options.push(new Option(value, value));
-  }
-  select.replaceChildren(...options);
-  select.value = current;
+function displayTime(item) {
+  const value = item.timestamp || (item.ts ? new Date(item.ts * 1000).toLocaleString() : "");
+  const match = String(value).match(/\d{4}-(\d{2})-(\d{2}) (\d{2}):(\d{2})/);
+  return match ? `${match[1]}/${match[2]} ${match[3]}:${match[4]}` : value;
 }
 
 function renderRecords() {
@@ -143,67 +148,76 @@ function renderRecords() {
     if (platform && item.platform !== platform) return false;
     if (type && item.type !== type) return false;
     if (!query) return true;
-    return [item.title, item.ip, item.location, item.url, item.platform, item.type]
-      .some((value) => String(value ?? "").toLowerCase().includes(query));
+    return String(item.title ?? "").toLowerCase().includes(query);
   });
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
-  currentPage = Math.min(currentPage, pageCount);
-  const start = (currentPage - 1) * pageSize;
-  const visible = filtered.slice(start, start + pageSize);
+  if (!filtered.length) {
+    const row = document.createElement("tr");
+    const cell = appendCell(row, "暂无记录", "legacy-empty");
+    cell.colSpan = 6;
+    elements.recordRows.replaceChildren(row);
+    elements.recordsMessage.textContent = "";
+    return;
+  }
   elements.recordRows.replaceChildren(
-    ...visible.map((item) => {
+    ...filtered.map((item) => {
       const row = document.createElement("tr");
-      appendCell(row, item.timestamp || (item.ts ? new Date(item.ts * 1000).toLocaleString() : ""));
-      appendCell(row, item.platform);
-      appendCell(row, item.type);
-      appendCell(row, item.title, "fzp-title-cell");
-      const ipCell = appendCell(row, item.ip);
+      appendCell(row, displayTime(item), "legacy-time");
+      const ipCell = appendCell(row, item.ip || "-", "legacy-ip");
       if (item.location) {
         const location = document.createElement("small");
+        location.className = "legacy-location";
         location.textContent = item.location;
         ipCell.append(document.createElement("br"), location);
       }
+      const platformCell = document.createElement("td");
+      const platformBadge = document.createElement("span");
+      platformBadge.className = `legacy-platform legacy-platform--${item.platform || "unknown"}`;
+      platformBadge.textContent = item.platform || "-";
+      platformCell.append(platformBadge);
+      row.append(platformCell);
+      const typeCell = document.createElement("td");
+      const typeBadge = document.createElement("span");
+      typeBadge.className = "legacy-type";
+      typeBadge.textContent = { video: "视频", photo: "图片", live_photo: "动图" }[item.type] || item.type || "-";
+      typeCell.append(typeBadge);
+      row.append(typeCell);
+      const titleCell = appendCell(row, item.title || "-", "legacy-title");
+      titleCell.title = item.title || "";
       const linkCell = document.createElement("td");
-      const link = document.createElement("a");
-      link.href = item.url || "#";
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      link.textContent = "打开";
-      linkCell.append(link);
+      const copyButton = document.createElement("button");
+      copyButton.className = "legacy-copy";
+      copyButton.type = "button";
+      copyButton.textContent = "复制";
+      copyButton.disabled = !item.url;
+      copyButton.addEventListener("click", async () => {
+        await navigator.clipboard.writeText(item.url);
+        copyButton.textContent = "已复制";
+        window.setTimeout(() => {
+          copyButton.textContent = "复制";
+        }, 2000);
+      });
+      linkCell.append(copyButton);
       row.append(linkCell);
       return row;
     }),
   );
-  elements.recordsMessage.textContent = `匹配 ${filtered.length} 条，最近载入 ${records.length} 条`;
-  elements.pageStatus.textContent = `第 ${currentPage} / ${pageCount} 页`;
-  elements.previousPage.disabled = currentPage <= 1;
-  elements.nextPage.disabled = currentPage >= pageCount;
+  elements.recordsMessage.textContent = filtered.length === records.length ? "" : `匹配 ${filtered.length} 条记录`;
 }
 
 async function loadRecords() {
-  elements.refreshButton.disabled = true;
-  elements.recordsMessage.textContent = "正在载入解析记录…";
   try {
     records = await api("/api/admin/records?limit=1000");
-    fillFilter(elements.platformFilter, records.map((item) => item.platform), "全部平台");
-    fillFilter(elements.typeFilter, records.map((item) => item.type), "全部类型");
+    renderStats();
     renderRecords();
   } catch (error) {
     if (error.status === 401) setView(false);
-    elements.recordsMessage.textContent = error.message;
-  } finally {
-    elements.refreshButton.disabled = false;
+    else elements.recordsMessage.textContent = `加载失败：${error.message}`;
   }
 }
 
-async function showDashboard(session) {
-  elements.currentUser.textContent = session.username;
-  elements.userAvatar.textContent = session.username.slice(0, 1).toUpperCase();
+async function showDashboard() {
   setView(true);
   try {
-    const overview = await api("/api/admin/overview");
-    elements.dashboardGreeting.textContent = overview.greeting;
-    renderStats(overview.stats);
     await loadRecords();
   } catch (error) {
     if (error.status === 401) setView(false);
@@ -261,27 +275,14 @@ elements.logoutButton.addEventListener("click", async () => {
   }
 });
 
-elements.refreshButton.addEventListener("click", loadRecords);
 for (const input of [elements.platformFilter, elements.typeFilter, elements.recordSearch]) {
-  input.addEventListener(input === elements.recordSearch ? "input" : "change", () => {
-    currentPage = 1;
-    renderRecords();
-  });
+  input.addEventListener(input === elements.recordSearch ? "input" : "change", renderRecords);
 }
-elements.previousPage.addEventListener("click", () => {
-  currentPage -= 1;
-  renderRecords();
-});
-elements.nextPage.addEventListener("click", () => {
-  currentPage += 1;
-  renderRecords();
-});
 
 async function boot() {
   try {
     const config = await api("/api/public/config");
     elements.brandName.textContent = config.appName;
-    elements.dashboardBrandName.textContent = config.appName;
     elements.brandDescription.textContent = config.appDescription;
     document.title = config.appName;
     if (!config.adminEnabled) {
