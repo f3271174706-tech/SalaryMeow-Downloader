@@ -15,6 +15,7 @@ const elements = {
   logoutButton: document.querySelector("#logoutButton"),
   platformFilter: document.querySelector("#platformFilter"),
   typeFilter: document.querySelector("#typeFilter"),
+  detailDateFilter: document.querySelector("#detailDateFilter"),
   recordSearch: document.querySelector("#recordSearch"),
   summaryDateFilter: document.querySelector("#summaryDateFilter"),
   summaryIpFilter: document.querySelector("#summaryIpFilter"),
@@ -195,14 +196,16 @@ function recordDate(item) {
   return new Date((Number(item.ts) + 8 * 3600) * 1000).toISOString().slice(0, 10);
 }
 
-function populateSummaryPresets() {
-  const currentDate = elements.summaryDateFilter.value;
+function populateFilterPresets() {
   const dates = [...new Set(records.map(recordDate).filter(Boolean))].sort().reverse();
-  elements.summaryDateFilter.replaceChildren(
-    new Option("全部日期", ""),
-    ...dates.map((date) => new Option(date, date)),
-  );
-  if (dates.includes(currentDate)) elements.summaryDateFilter.value = currentDate;
+  for (const select of [elements.detailDateFilter, elements.summaryDateFilter]) {
+    const currentDate = select.value;
+    select.replaceChildren(
+      new Option("全部日期", ""),
+      ...dates.map((date) => new Option(date, date)),
+    );
+    if (dates.includes(currentDate)) select.value = currentDate;
+  }
 
   const currentIp = elements.summaryIpFilter.value;
   const ipLabels = new Map();
@@ -224,7 +227,7 @@ function renderRecords() {
   const platform = summaryMode ? "" : elements.platformFilter.value;
   const type = summaryMode ? "" : elements.typeFilter.value;
   const query = summaryMode ? "" : elements.recordSearch.value.trim().toLowerCase();
-  const selectedDate = summaryMode ? elements.summaryDateFilter.value : "";
+  const selectedDate = summaryMode ? elements.summaryDateFilter.value : elements.detailDateFilter.value;
   const selectedIp = summaryMode ? elements.summaryIpFilter.value : "";
   const filtered = records.filter((item) => {
     if (platform && item.platform !== platform) return false;
@@ -305,7 +308,7 @@ function renderRecords() {
 async function loadRecords() {
   try {
     records = await api("/api/admin/records?limit=1000");
-    populateSummaryPresets();
+    populateFilterPresets();
     renderStats();
     renderRecords();
   } catch (error) {
@@ -379,7 +382,12 @@ elements.logoutButton.addEventListener("click", async () => {
   }
 });
 
-for (const input of [elements.platformFilter, elements.typeFilter, elements.recordSearch]) {
+for (const input of [
+  elements.platformFilter,
+  elements.typeFilter,
+  elements.detailDateFilter,
+  elements.recordSearch,
+]) {
   input.addEventListener(input === elements.recordSearch ? "input" : "change", () => {
     currentPage = 1;
     renderRecords();
