@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 from app.api.dependencies import get_auth_service, settings_dep
 from app.core.settings import AppSettings
@@ -31,36 +31,6 @@ document.getElementById("f").addEventListener("submit", async (event) => {
 </script></body></html>"""
 
 
-ADMIN_HTML = """<!doctype html>
-<html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Admin</title>
-<style>body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:24px;background:#f8f9fb;color:#111}table{width:100%;border-collapse:collapse;background:#fff}td,th{padding:10px;border-bottom:1px solid #e6e8ec;text-align:left;vertical-align:top}input,button{padding:10px;border-radius:8px;border:1px solid #d8dbe2}button{background:#111;color:#fff;border:0}.login{max-width:360px}.muted{color:#667085}</style></head>
-<body><section id="login" class="login"><h1>Admin</h1><input id="u" placeholder="用户名"><input id="p" placeholder="密码" type="password"><button id="b">登录</button><p id="e" class="muted"></p></section><section id="panel" hidden><h1>解析记录</h1><table><thead><tr><th>时间</th><th>平台</th><th>类型</th><th>标题</th><th>IP</th><th>URL</th></tr></thead><tbody id="rows"></tbody></table></section>
-<script>
-const text = (value) => document.createTextNode(String(value ?? ""));
-function cell(row, value) { const td = document.createElement("td"); td.appendChild(text(value)); row.appendChild(td); }
-async function loadRows() {
-  const resp = await fetch("/api/admin/records");
-  if (!resp.ok) return;
-  document.getElementById("login").hidden = true;
-  document.getElementById("panel").hidden = false;
-  const rows = document.getElementById("rows");
-  rows.textContent = "";
-  for (const item of await resp.json()) {
-    const tr = document.createElement("tr");
-    cell(tr, item.ts ? new Date(item.ts * 1000).toLocaleString() : "");
-    cell(tr, item.platform); cell(tr, item.type); cell(tr, item.title); cell(tr, item.ip); cell(tr, item.url);
-    rows.appendChild(tr);
-  }
-}
-document.getElementById("b").addEventListener("click", async () => {
-  const resp = await fetch("/api/admin/login", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({username:document.getElementById("u").value, password:document.getElementById("p").value})});
-  if (resp.ok) loadRows(); else document.getElementById("e").textContent = "登录失败或后台未启用";
-});
-loadRows();
-</script></body></html>"""
-
-
 @router.get("/")
 def index(
     request: Request, settings: AppSettings = Depends(settings_dep), auth: AuthService = Depends(get_auth_service)
@@ -84,14 +54,14 @@ def index_v2(settings: AppSettings = Depends(settings_dep)):
 
 
 @router.get("/admin/login", response_model=None)
-def admin_login_page(settings: AppSettings = Depends(settings_dep)) -> HTMLResponse | RedirectResponse:
+def admin_login_page(settings: AppSettings = Depends(settings_dep)) -> FileResponse | RedirectResponse:
     if settings.security.admin_external_url:
         return RedirectResponse(settings.security.admin_external_url, status_code=302)
-    return HTMLResponse(ADMIN_HTML)
+    return FileResponse(settings.paths.web_static_dir.parent / "admin" / "index.html")
 
 
 @router.get("/admin", response_model=None)
-def admin_page(settings: AppSettings = Depends(settings_dep)) -> HTMLResponse | RedirectResponse:
+def admin_page(settings: AppSettings = Depends(settings_dep)) -> FileResponse | RedirectResponse:
     if settings.security.admin_external_url:
         return RedirectResponse(settings.security.admin_external_url, status_code=302)
-    return HTMLResponse(ADMIN_HTML)
+    return FileResponse(settings.paths.web_static_dir.parent / "admin" / "index.html")

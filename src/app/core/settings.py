@@ -23,8 +23,15 @@ class SecuritySettings(BaseModel):
     invite_session_ttl_seconds: int = 7 * 24 * 3600
     admin_user: str = "admin"
     admin_password: str = ""
+    admin_password_hash: str = ""
     admin_external_url: str = ""
-    admin_session_ttl_seconds: int = 24 * 3600
+    admin_session_secret: str = ""
+    admin_session_ttl_seconds: int = 8 * 3600
+    admin_trusted_origins: list[str] = Field(default_factory=lambda: ["http://127.0.0.1:9000", "http://localhost:9000"])
+    admin_app_name: str = "FZP Downloader Console"
+    admin_app_description: str = "媒体解析服务管理工作台"
+    admin_max_login_failures: int = 5
+    admin_login_failure_window_seconds: int = 15 * 60
     trust_proxy_headers: bool = False
     trusted_proxy_cidrs: list[str] = Field(default_factory=list)
     secure_cookies: bool = False
@@ -83,7 +90,7 @@ class AppSettings(BaseModel):
 
     @property
     def admin_enabled(self) -> bool:
-        return bool(self.security.admin_password)
+        return bool(self.security.admin_password_hash or self.security.admin_password)
 
     def validate_for_startup(self) -> list[str]:
         warnings: list[str] = []
@@ -91,6 +98,14 @@ class AppSettings(BaseModel):
             admin_url = urlparse(self.security.admin_external_url)
             if admin_url.scheme != "https" or not admin_url.hostname:
                 raise RuntimeError("ADMIN_EXTERNAL_URL must be an absolute HTTPS URL")
+        if self.security.admin_password_hash and not self.security.admin_password_hash.startswith("scrypt$"):
+            raise RuntimeError("FZP_ADMIN_PASSWORD_HASH must be a supported scrypt hash")
+        if self.security.admin_session_ttl_seconds < 300:
+            raise RuntimeError("FZP_SESSION_TTL_SECONDS must be at least 300")
+        if self.security.admin_max_login_failures < 1:
+            raise RuntimeError("FZP_MAX_LOGIN_FAILURES must be positive")
+        if self.admin_enabled and len(self.security.admin_session_secret or self.security.session_secret) < 32:
+            raise RuntimeError("FZP_SESSION_SECRET must contain at least 32 characters when admin login is enabled")
         if self.is_production:
             if len(self.security.session_secret) < 32:
                 raise RuntimeError("DOUYIN_SESSION_SECRET must be set to at least 32 characters in production")
@@ -98,6 +113,8 @@ class AppSettings(BaseModel):
                 raise RuntimeError("DOUYIN_INVITE_CODES must be set in production")
             if not self.security.secure_cookies:
                 raise RuntimeError("DOUYIN_SECURE_COOKIES must be true in production")
+            if self.admin_enabled and not self.security.admin_password_hash:
+                raise RuntimeError("FZP_ADMIN_PASSWORD_HASH is required for the production admin")
         elif not self.security.session_secret:
             self.security.session_secret = secrets.token_urlsafe(32)
             warnings.append(
@@ -136,6 +153,16 @@ def _apply_env(data: dict[str, Any]) -> dict[str, Any]:
         "ADMIN_USER": (security, "admin_user"),
         "ADMIN_PASS": (security, "admin_password"),
         "ADMIN_EXTERNAL_URL": (security, "admin_external_url"),
+        "FZP_ADMIN_USER": (security, "admin_user"),
+        "FZP_ADMIN_PASSWORD_HASH": (security, "admin_password_hash"),
+        "FZP_SESSION_SECRET": (security, "admin_session_secret"),
+        "FZP_SESSION_TTL_SECONDS": (security, "admin_session_ttl_seconds"),
+        "FZP_APP_ENV": (security, "app_env"),
+        "FZP_SECURE_COOKIES": (security, "secure_cookies"),
+        "FZP_APP_NAME": (security, "admin_app_name"),
+        "FZP_APP_DESCRIPTION": (security, "admin_app_description"),
+        "FZP_MAX_LOGIN_FAILURES": (security, "admin_max_login_failures"),
+        "FZP_LOGIN_FAILURE_WINDOW_SECONDS": (security, "admin_login_failure_window_seconds"),
         "DOUYIN_TRUST_PROXY_HEADERS": (security, "trust_proxy_headers"),
         "DOUYIN_SECURE_COOKIES": (security, "secure_cookies"),
         "DOUYIN_PRELOAD_ENABLED": (resources, "preload_enabled"),
@@ -176,6 +203,9 @@ def _apply_env(data: dict[str, Any]) -> dict[str, Any]:
                 "preload_cache_max_entries",
                 "preload_concurrency",
                 "records_max_file_bytes",
+                "admin_session_ttl_seconds",
+                "admin_max_login_failures",
+                "admin_login_failure_window_seconds",
             }:
                 target[key] = int(raw)
             elif key == "preload_wait_seconds":
@@ -193,6 +223,10 @@ def _apply_env(data: dict[str, Any]) -> dict[str, Any]:
         resources["preload_platforms"] = _split_csv(os.environ["DOUYIN_PRELOAD_PLATFORMS"])
     if "DOUYIN_TRUSTED_PROXY_CIDRS" in os.environ:
         security["trusted_proxy_cidrs"] = _split_csv(os.environ["DOUYIN_TRUSTED_PROXY_CIDRS"])
+    if "FZP_TRUSTED_ORIGINS" in os.environ:
+        security["admin_trusted_origins"] = [
+            origin.rstrip("/") for origin in _split_csv(os.environ["FZP_TRUSTED_ORIGINS"])
+        ]
 
     data["security"] = security
     data["resources"] = resources

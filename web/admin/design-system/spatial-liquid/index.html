@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spatial Liquid · FZP Design System</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="../shared/foundations.css">
+    <link rel="stylesheet" href="./spatial-liquid.css">
+    <style>
+      body { margin: 0; }
+      .demo-shell {
+        width: min(1080px, calc(100vw - 32px));
+        min-height: 100vh;
+        margin: 0 auto;
+        padding: 24px 0 64px;
+      }
+      .demo-nav {
+        min-height: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 10px 8px 18px;
+        --fzp-surface-radius: 22px;
+      }
+      .demo-brand { display: grid; }
+      .demo-brand strong { font-size: 0.85rem; }
+      .demo-brand span { color: var(--fzp-text-tertiary); font-size: 0.7rem; }
+      .demo-main {
+        min-height: calc(100vh - 130px);
+        display: grid;
+        grid-template-columns: 0.85fr 1.15fr;
+        align-items: center;
+        gap: clamp(44px, 8vw, 110px);
+        padding: 54px 28px;
+      }
+      .demo-copy { position: relative; z-index: 12; }
+      .demo-copy .fzp-eyebrow { margin-bottom: 14px; }
+      .demo-copy .fzp-copy { margin-top: 20px; line-height: 1.8; }
+      .demo-actions { margin-top: 28px; }
+      .demo-stage { position: relative; min-height: 500px; }
+      .demo-preview {
+        position: absolute;
+        inset: 20px 0 auto;
+        min-height: 320px;
+        padding: 26px;
+        --fzp-surface-radius: 34px;
+      }
+      .demo-art {
+        min-height: 265px;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,.18);
+        border-radius: 22px;
+        background: radial-gradient(circle at 30% 20%, rgba(255,255,255,.28), transparent 35%),
+          rgba(70,120,185,.18);
+        font-size: clamp(2.4rem, 7vw, 4.6rem);
+        font-weight: 750;
+        letter-spacing: -.07em;
+      }
+      .demo-control {
+        position: absolute;
+        right: 32px;
+        bottom: 0;
+        z-index: 8;
+        width: min(440px, calc(100% - 32px));
+        display: grid;
+        gap: 16px;
+        padding: 24px;
+        --fzp-surface-radius: 26px;
+      }
+      .demo-input-row { display: flex; gap: 10px; }
+      .demo-state {
+        color: var(--fzp-text-tertiary);
+        font-size: 0.7rem;
+      }
+      @media (max-width: 760px) {
+        .demo-main { grid-template-columns: 1fr; padding-inline: 4px; }
+        .demo-stage { min-height: 570px; }
+        .demo-preview { position: relative; top: 0; }
+        .demo-control { right: 8px; }
+        .demo-actions .fzp-button { flex: 1 1 100%; }
+        .demo-input-row { flex-direction: column; }
+      }
+    </style>
+  </head>
+  <body class="fzp-root fzp-spatial">
+    <div class="fzp-spatial-background" aria-hidden="true"></div>
+
+    <div class="demo-shell">
+      <nav class="demo-nav" data-fzp-liquid>
+        <div class="demo-brand">
+          <strong>Spatial Liquid</strong>
+          <span>FZP Design System</span>
+        </div>
+        <span class="demo-state" id="renderState">CSS ready</span>
+      </nav>
+
+      <main class="demo-main">
+        <section class="demo-copy">
+          <p class="fzp-eyebrow">STYLE FAMILY · 02</p>
+          <h1 class="fzp-title">让内容悬浮，让背景产生真实折射。</h1>
+          <p class="fzp-copy">
+            这是 Spatial Liquid 的独立调用示例。所有液态面板都只需要
+            data-fzp-liquid。
+          </p>
+          <div class="fzp-cluster demo-actions">
+            <button class="fzp-button fzp-button--primary" type="button">进入空间</button>
+            <button class="fzp-button" type="button">查看参数</button>
+          </div>
+        </section>
+
+        <div class="demo-stage">
+          <section class="demo-preview" data-fzp-liquid>
+            <div class="demo-art">SPATIAL</div>
+          </section>
+
+          <section class="demo-control" data-fzp-liquid>
+            <div>
+              <p class="fzp-eyebrow">Quick control</p>
+              <strong>生成一个空间场景</strong>
+            </div>
+            <div class="demo-input-row">
+              <input class="fzp-input" placeholder="Describe the scene...">
+              <button class="fzp-button fzp-button--warm" type="button">Generate</button>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <script src="./vendor/html2canvas.min.js"></script>
+    <script src="./vendor/liquidGL.js"></script>
+    <script type="module">
+      import { initSpatialLiquid } from "./spatial-liquid.js";
+
+      const state = document.querySelector("#renderState");
+      const spatial = initSpatialLiquid({ root: ".fzp-spatial" });
+      state.textContent = "Initializing";
+
+      const finalState = await spatial.ready;
+      state.textContent = finalState.active ? "WebGL active" : "CSS fallback";
+    </script>
+  </body>
+</html>

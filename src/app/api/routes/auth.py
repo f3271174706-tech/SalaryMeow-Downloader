@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Request, Response, status
 from pydantic import BaseModel
 
 from app.api.dependencies import get_auth_service
@@ -18,6 +18,16 @@ class InviteRequest(BaseModel):
 class AdminLoginRequest(BaseModel):
     username: str
     password: str
+
+
+@router.get("/api/public/config")
+def public_config(auth: AuthService = Depends(get_auth_service)) -> dict[str, str | bool]:
+    settings = auth.settings
+    return {
+        "appName": settings.security.admin_app_name,
+        "appDescription": settings.security.admin_app_description,
+        "adminEnabled": settings.admin_enabled,
+    }
 
 
 @router.post("/api/verify-invite")
@@ -36,11 +46,22 @@ def admin_login(
     request: Request,
     response: Response,
     auth: AuthService = Depends(get_auth_service),
-) -> dict[str, bool]:
+) -> dict[str, str | int]:
     return auth.login_admin(payload.username, payload.password, request, response)
 
 
-@router.post("/api/admin/logout")
-def admin_logout(response: Response) -> dict[str, bool]:
-    response.delete_cookie("admin_session")
-    return {"success": True}
+@router.get("/api/admin/session")
+def admin_session(
+    request: Request,
+    auth: AuthService = Depends(get_auth_service),
+) -> dict[str, str | int]:
+    return auth.admin_session_status(request)
+
+
+@router.post("/api/admin/logout", status_code=status.HTTP_204_NO_CONTENT)
+def admin_logout(
+    request: Request,
+    response: Response,
+    auth: AuthService = Depends(get_auth_service),
+) -> None:
+    auth.logout_admin(request, response)

@@ -6,7 +6,7 @@ from functools import lru_cache
 
 from fastapi import Depends, Request
 
-from app.core.security import get_client_ip
+from app.core.security import AdminSession, get_client_ip
 from app.core.settings import AppSettings, get_settings
 from app.infrastructure.rate_limit import AsyncConcurrencyLimit, ConcurrencyLimit, RateLimiter
 from app.services.auth_service import AuthService
@@ -81,8 +81,8 @@ def require_invite_session(
     auth.require_invite_session(request)
 
 
-def require_admin_session(request: Request, auth: AuthService = Depends(get_auth_service)) -> None:
-    auth.require_admin_session(request)
+def require_admin_session(request: Request, auth: AuthService = Depends(get_auth_service)) -> AdminSession:
+    return auth.require_admin_session(request)
 
 
 def settings_dep() -> AppSettings:

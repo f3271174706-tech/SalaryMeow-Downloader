@@ -136,8 +136,12 @@ DOUYIN_F2_PREWARM_ENABLED=true
 | `DOUYIN_INVITE_CODES` | 空 | 逗号分隔的邀请码 |
 | `DOUYIN_INVITE_AUTH_ENABLED` | `true` | 是否要求邀请码会话；公开站点可设为 `false` |
 | `DOUYIN_SESSION_SECRET` | 开发环境临时生成 | Session 签名密钥，生产至少 32 字符 |
-| `ADMIN_USER` | `admin` | 管理员用户名 |
-| `ADMIN_PASS` | 空 | 管理员密码；为空时后台禁用 |
+| `FZP_ADMIN_USER` | `admin` | 管理员用户名 |
+| `FZP_ADMIN_PASSWORD_HASH` | 空 | scrypt 管理员密码哈希；为空时后台禁用 |
+| `FZP_SESSION_SECRET` | 空 | Admin 独立会话签名密钥，至少 32 字符 |
+| `FZP_SESSION_TTL_SECONDS` | `28800` | Admin 会话有效期 |
+| `FZP_TRUSTED_ORIGINS` | 本地地址 | 允许发起登录、退出的来源 |
+| `FZP_APP_NAME` | `FZP Downloader Console` | 后台标题 |
 | `ADMIN_EXTERNAL_URL` | 空 | 将本实例后台页面重定向到共享管理后台 |
 | `DOUYIN_HTTP_PROXY` | 空 | 仅供 TikTok 和 X/Twitter 使用的 HTTP 代理 |
 | `DOUYIN_F2_PREWARM_ENABLED` | `true` | 启动时预热抖音 f2 请求栈 |
@@ -162,6 +166,9 @@ DOUYIN_F2_PREWARM_ENABLED=true
 | `/api/stream` | GET | 邀请码会话 | 支持 Range 的流式代理 |
 | `/api/download/*` | GET/POST | 邀请码会话 | 下载媒体或生成文件 |
 | `/api/admin/login` | POST | 无 | 管理员登录 |
+| `/api/admin/session` | GET | 管理员会话 | 查询当前会话 |
+| `/api/admin/logout` | POST | 管理员会话 | 退出后台 |
+| `/api/admin/overview` | GET | 管理员会话 | 查询解析统计 |
 | `/api/admin/records` | GET | 管理员会话 | 查询解析记录 |
 | `/health/live` | GET | 无 | 进程存活检查 |
 | `/health/ready` | GET | 无 | 依赖和目录就绪检查 |

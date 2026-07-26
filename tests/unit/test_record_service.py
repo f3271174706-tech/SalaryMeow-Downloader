@@ -68,3 +68,18 @@ def test_record_resolves_and_caches_public_ip_location(tmp_path, monkeypatch) ->
 
     assert service.list_records(limit=1)[0]["location"] == "中国 广东 深圳"
     assert calls == 1
+
+
+def test_record_overview_counts_valid_records_and_ignores_invalid_lines(tmp_path) -> None:
+    settings = AppSettings.model_validate({"paths": {"logs_dir": tmp_path}})
+    service = RecordService(settings)
+    service.append(url="https://example.test/1", platform="douyin", media_type="video", title="one", ip="127.0.0.1")
+    with service.path.open("a", encoding="utf-8") as file:
+        file.write("not-json\n")
+
+    overview = service.overview()
+
+    assert overview["total"] == 1
+    assert overview["today"] == 1
+    assert overview["invalid"] == 1
+    assert overview["platforms"] == {"douyin": 1}

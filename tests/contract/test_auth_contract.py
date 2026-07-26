@@ -5,11 +5,18 @@ import importlib
 from fastapi.testclient import TestClient
 
 
-def _client(monkeypatch, *, invite_auth_enabled: bool = True):
+def _client(monkeypatch, *, invite_auth_enabled: bool = True, admin_password: str = ""):
     monkeypatch.setenv("DOUYIN_SESSION_SECRET", "test-session-secret-test-session-secret")
     monkeypatch.setenv("DOUYIN_INVITE_CODES", "let-me-in")
     monkeypatch.setenv("DOUYIN_INVITE_AUTH_ENABLED", str(invite_auth_enabled).lower())
     monkeypatch.delenv("ADMIN_PASS", raising=False)
+    monkeypatch.delenv("FZP_ADMIN_PASSWORD_HASH", raising=False)
+    monkeypatch.delenv("FZP_SESSION_SECRET", raising=False)
+    if admin_password:
+        from app.core.security import hash_admin_password
+
+        monkeypatch.setenv("FZP_ADMIN_PASSWORD_HASH", hash_admin_password(admin_password))
+        monkeypatch.setenv("FZP_SESSION_SECRET", "admin-session-secret-admin-session-secret")
     monkeypatch.setenv("DOUYIN_SECURE_COOKIES", "false")
     from app.core.settings import get_settings
 
@@ -17,6 +24,7 @@ def _client(monkeypatch, *, invite_auth_enabled: bool = True):
     from app.api import dependencies
 
     dependencies.get_auth_service.cache_clear()
+    dependencies.get_record_service.cache_clear()
     module = importlib.import_module("app.main")
     return TestClient(module.create_app())
 
@@ -77,3 +85,36 @@ def test_admin_pages_can_redirect_to_shared_dashboard(monkeypatch) -> None:
 
     assert response.status_code == 302
     assert response.headers["location"] == "https://legacy.example.com/admin"
+
+
+def test_admin_uses_hashed_password_and_strict_session_cookie(monkeypatch) -> None:
+    client = _client(monkeypatch, admin_password="a-strong-admin-password")
+
+    login = client.post(
+        "/api/admin/login",
+        json={"username": "admin", "password": "a-strong-admin-password"},
+        headers={"Origin": "http://127.0.0.1:9000"},
+    )
+    session = client.get("/api/admin/session")
+    overview = client.get("/api/admin/overview")
+
+    assert login.status_code == 200
+    assert "fzp_admin_session=" in login.headers["set-cookie"]
+    assert "HttpOnly" in login.headers["set-cookie"]
+    assert "SameSite=strict" in login.headers["set-cookie"]
+    assert session.status_code == 200
+    assert session.json()["username"] == "admin"
+    assert overview.status_code == 200
+    assert overview.json()["summary"]["total"] >= 0
+
+
+def test_admin_rejects_untrusted_login_origin(monkeypatch) -> None:
+    client = _client(monkeypatch, admin_password="a-strong-admin-password")
+
+    response = client.post(
+        "/api/admin/login",
+        json={"username": "admin", "password": "a-strong-admin-password"},
+        headers={"Origin": "https://evil.example"},
+    )
+
+    assert response.status_code == 403

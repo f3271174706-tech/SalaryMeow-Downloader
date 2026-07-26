@@ -11,7 +11,12 @@ security:
   invite_codes:
     - change-me-invite-code
   admin_user: admin
-  admin_password: change-me-admin-password
+  # Prefer FZP_ADMIN_PASSWORD_HASH and FZP_SESSION_SECRET environment variables.
+  admin_password_hash: ""
+  admin_session_secret: ""
+  admin_trusted_origins:
+    - http://127.0.0.1:9000
+    - http://localhost:9000
   # Optional shared admin dashboard; /admin and /admin/login redirect here.
   admin_external_url: ""
   trust_proxy_headers: false

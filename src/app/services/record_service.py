@@ -6,7 +6,7 @@ import ipaddress
 import json
 import threading
 import time
-from collections import deque
+from collections import Counter, deque
 from datetime import UTC, datetime, timedelta, timezone
 
 import httpx
@@ -63,6 +63,41 @@ class RecordService:
                     continue
                 records.append(item)
         return list(reversed(records))
+
+    def overview(self) -> dict[str, object]:
+        total = 0
+        today = 0
+        invalid = 0
+        platforms: Counter[str] = Counter()
+        media_types: Counter[str] = Counter()
+        today_text = datetime.now(BEIJING_TIMEZONE).strftime("%Y-%m-%d")
+        if not self.path.exists():
+            return {
+                "total": total,
+                "today": today,
+                "invalid": invalid,
+                "platforms": {},
+                "mediaTypes": {},
+            }
+        with self._lock, self.path.open("r", encoding="utf-8") as file:
+            for line in file:
+                try:
+                    item = json.loads(line)
+                except json.JSONDecodeError:
+                    invalid += 1
+                    continue
+                total += 1
+                if str(item.get("timestamp", "")).startswith(today_text):
+                    today += 1
+                platforms[str(item.get("platform") or "unknown")] += 1
+                media_types[str(item.get("type") or "unknown")] += 1
+        return {
+            "total": total,
+            "today": today,
+            "invalid": invalid,
+            "platforms": dict(platforms.most_common()),
+            "mediaTypes": dict(media_types.most_common()),
+        }
 
     def _get_ip_location(self, ip: str) -> str:
         """Resolve a public client IP for the legacy admin record format."""

@@ -24,6 +24,9 @@ def create_app() -> FastAPI:
     )
     application.add_middleware(SecurityHeadersMiddleware)
     application.mount("/static", StaticFiles(directory=settings.paths.web_static_dir), name="static")
+    admin_assets = settings.paths.web_static_dir.parent / "admin"
+    if admin_assets.exists():
+        application.mount("/admin-assets", StaticFiles(directory=admin_assets), name="admin-assets")
     for router in (
         health.router,
         auth.router,

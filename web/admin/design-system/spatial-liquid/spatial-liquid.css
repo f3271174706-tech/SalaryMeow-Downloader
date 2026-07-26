@@ -1,0 +1,213 @@
+/* FZP Design System · Spatial Liquid */
+.fzp-spatial {
+  --fzp-text-primary: rgba(255, 255, 255, 0.94);
+  --fzp-text-secondary: rgba(255, 255, 255, 0.68);
+  --fzp-text-tertiary: rgba(255, 255, 255, 0.42);
+  --fzp-spatial-accent: #90b4ff;
+  --fzp-spatial-warm: #ff9b63;
+  --fzp-spatial-background-image: url("./assets/liquid-blue.png");
+  --fzp-focus-ring: rgba(160, 205, 255, 0.56);
+  min-height: 100vh;
+  overflow: hidden;
+  color: var(--fzp-text-primary);
+  background: #6d91c1;
+}
+
+.fzp-spatial .fzp-spatial-background {
+  position: absolute;
+  inset: 0;
+  z-index: -3;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(21, 44, 79, 0.08), rgba(12, 33, 67, 0.18)),
+    var(--fzp-spatial-background-image) center / cover no-repeat;
+  transform: scale(1.015);
+}
+
+.fzp-spatial .fzp-spatial-background::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 42%, transparent 15%, rgba(18, 40, 75, 0.08) 75%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(23, 47, 82, 0.1));
+}
+
+.fzp-spatial .fzp-surface,
+.fzp-spatial .fzp-liquid-target {
+  color: var(--fzp-text-primary);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.105), rgba(150, 200, 255, 0.035)),
+    rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 22px 58px rgba(20, 48, 85, 0.24),
+    0 4px 14px rgba(20, 48, 85, 0.14);
+  backdrop-filter: blur(18px) saturate(145%);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
+}
+
+.fzp-spatial .fzp-spatial-panel {
+  position: relative;
+  isolation: isolate;
+  border-radius: var(--fzp-surface-radius, var(--fzp-radius-xl));
+}
+
+.fzp-spatial .fzp-spatial-panel__glass {
+  position: absolute;
+  inset: 0;
+  /*
+   * Direct-body default. In a nested React/Vue app shell, override this with
+   * z-index: auto and give the shell an explicit positive layer.
+   * See ./LAYERING.md.
+   */
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.fzp-spatial .fzp-spatial-panel > :not(.fzp-spatial-panel__glass) {
+  position: relative;
+  z-index: 10;
+}
+
+.fzp-spatial .fzp-surface::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 22% 8%, rgba(255, 255, 255, 0.18), transparent 30%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.09), transparent 44%);
+}
+
+.fzp-spatial .fzp-surface--floating {
+  animation: fzp-float 7s var(--fzp-ease-out) infinite;
+}
+
+.fzp-spatial .fzp-button {
+  color: var(--fzp-text-secondary);
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.12) inset,
+    0 7px 18px rgba(24, 55, 95, 0.14);
+  text-shadow: 0 1px 8px rgba(23, 45, 80, 0.38);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.fzp-spatial .fzp-button:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.fzp-spatial .fzp-button--primary {
+  color: #f8fbff;
+  background: linear-gradient(135deg, rgba(105, 165, 255, 0.28), rgba(190, 145, 255, 0.16));
+  border-color: rgba(180, 215, 255, 0.36);
+}
+
+.fzp-spatial .fzp-button--warm {
+  color: #fff1e8;
+  background: rgba(255, 135, 80, 0.18);
+  border-color: rgba(255, 175, 125, 0.3);
+}
+
+.fzp-spatial .fzp-input {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.065);
+  border-color: rgba(255, 255, 255, 0.14);
+  text-shadow: 0 1px 8px rgba(23, 45, 80, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.fzp-spatial .fzp-input::placeholder {
+  color: var(--fzp-text-tertiary);
+}
+
+.fzp-spatial .fzp-input:focus {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(175, 215, 255, 0.5);
+  box-shadow:
+    0 0 0 4px rgba(145, 190, 255, 0.12),
+    0 9px 24px rgba(23, 45, 80, 0.14);
+}
+
+.fzp-spatial .fzp-segmented {
+  color: var(--fzp-text-tertiary);
+  background: rgba(150, 200, 255, 0.07);
+  border: 1px solid rgba(190, 220, 255, 0.15);
+  box-shadow: 0 8px 24px rgba(20, 48, 85, 0.15);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.fzp-spatial .fzp-segmented button {
+  color: inherit;
+  text-shadow: 0 1px 7px rgba(23, 45, 80, 0.38);
+}
+
+.fzp-spatial .fzp-segmented button[aria-pressed="true"] {
+  color: var(--fzp-spatial-warm);
+  background: rgba(255, 255, 255, 0.11);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 2px 9px rgba(20, 48, 85, 0.18),
+    0 1px 0 rgba(255, 255, 255, 0.12) inset;
+}
+
+.fzp-spatial .fzp-eyebrow,
+.fzp-spatial .fzp-copy {
+  color: var(--fzp-text-secondary);
+  text-shadow: 0 1px 10px rgba(23, 45, 80, 0.32);
+}
+
+.fzp-spatial .fzp-subtle {
+  color: var(--fzp-text-tertiary);
+}
+
+.fzp-spatial .fzp-orbit {
+  position: absolute;
+  width: 260px;
+  height: 260px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow:
+    0 0 60px rgba(140, 200, 255, 0.13),
+    0 0 0 22px rgba(255, 255, 255, 0.018) inset;
+}
+
+.fzp-spatial .fzp-liquid-target > canvas {
+  border-radius: inherit;
+  pointer-events: none !important;
+}
+
+.fzp-spatial[data-fzp-webgl="active"] .fzp-liquid-target {
+  background: rgba(255, 255, 255, 0.025);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.fzp-spatial[data-fzp-webgl="fallback"] .fzp-liquid-target::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.12), transparent 34%, rgba(160, 210, 255, 0.06));
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .fzp-spatial .fzp-surface,
+  .fzp-spatial .fzp-liquid-target {
+    background: rgba(67, 103, 148, 0.88);
+  }
+}
