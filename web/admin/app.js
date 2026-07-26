@@ -16,8 +16,8 @@ const elements = {
   platformFilter: document.querySelector("#platformFilter"),
   typeFilter: document.querySelector("#typeFilter"),
   recordSearch: document.querySelector("#recordSearch"),
-  summaryTimeSearch: document.querySelector("#summaryTimeSearch"),
-  summaryAddressSearch: document.querySelector("#summaryAddressSearch"),
+  summaryDateFilter: document.querySelector("#summaryDateFilter"),
+  summaryIpFilter: document.querySelector("#summaryIpFilter"),
   mobileOverviewButton: document.querySelector("#mobileOverviewButton"),
   recordsMessage: document.querySelector("#recordsMessage"),
   recordRows: document.querySelector("#recordRows"),
@@ -185,27 +185,53 @@ function displayTime(item) {
     : value;
 }
 
+function recordDate(item) {
+  const value = String(item.timestamp || "");
+  const match = value.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+  if (match) {
+    return `${match[1]}-${match[2].padStart(2, "0")}-${match[3].padStart(2, "0")}`;
+  }
+  if (!item.ts) return "";
+  return new Date((Number(item.ts) + 8 * 3600) * 1000).toISOString().slice(0, 10);
+}
+
+function populateSummaryPresets() {
+  const currentDate = elements.summaryDateFilter.value;
+  const dates = [...new Set(records.map(recordDate).filter(Boolean))].sort().reverse();
+  elements.summaryDateFilter.replaceChildren(
+    new Option("全部日期", ""),
+    ...dates.map((date) => new Option(date, date)),
+  );
+  if (dates.includes(currentDate)) elements.summaryDateFilter.value = currentDate;
+
+  const currentIp = elements.summaryIpFilter.value;
+  const ipLabels = new Map();
+  for (const item of records) {
+    if (!item.ip) continue;
+    const label = item.location ? `${item.ip} · ${item.location}` : item.ip;
+    if (!ipLabels.has(item.ip) || item.location) ipLabels.set(item.ip, label);
+  }
+  const ips = [...ipLabels.entries()].sort(([left], [right]) => left.localeCompare(right));
+  elements.summaryIpFilter.replaceChildren(
+    new Option("全部 IP / 地址", ""),
+    ...ips.map(([ip, label]) => new Option(label, ip)),
+  );
+  if (ipLabels.has(currentIp)) elements.summaryIpFilter.value = currentIp;
+}
+
 function renderRecords() {
   const summaryMode = elements.dashboardView.classList.contains("legacy-admin--summary");
   const platform = summaryMode ? "" : elements.platformFilter.value;
   const type = summaryMode ? "" : elements.typeFilter.value;
   const query = summaryMode ? "" : elements.recordSearch.value.trim().toLowerCase();
-  const timeQuery = summaryMode ? elements.summaryTimeSearch.value.trim().toLowerCase() : "";
-  const addressQuery = summaryMode ? elements.summaryAddressSearch.value.trim().toLowerCase() : "";
+  const selectedDate = summaryMode ? elements.summaryDateFilter.value : "";
+  const selectedIp = summaryMode ? elements.summaryIpFilter.value : "";
   const filtered = records.filter((item) => {
     if (platform && item.platform !== platform) return false;
     if (type && item.type !== type) return false;
     if (query && !String(item.title ?? "").toLowerCase().includes(query)) return false;
-    if (
-      timeQuery
-      && ![item.timestamp, displayTime(item)]
-        .some((value) => String(value ?? "").toLowerCase().includes(timeQuery))
-    ) return false;
-    if (
-      addressQuery
-      && ![item.ip, item.location]
-        .some((value) => String(value ?? "").toLowerCase().includes(addressQuery))
-    ) return false;
+    if (selectedDate && recordDate(item) !== selectedDate) return false;
+    if (selectedIp && item.ip !== selectedIp) return false;
     return true;
   });
   if (!filtered.length) {
@@ -279,6 +305,7 @@ function renderRecords() {
 async function loadRecords() {
   try {
     records = await api("/api/admin/records?limit=1000");
+    populateSummaryPresets();
     renderStats();
     renderRecords();
   } catch (error) {
@@ -343,8 +370,8 @@ elements.logoutButton.addEventListener("click", async () => {
     elements.dashboardView.classList.remove("legacy-admin--summary");
     elements.mobileOverviewButton.setAttribute("aria-pressed", "false");
     elements.mobileOverviewButton.textContent = "总览";
-    elements.summaryTimeSearch.value = "";
-    elements.summaryAddressSearch.value = "";
+    elements.summaryDateFilter.value = "";
+    elements.summaryIpFilter.value = "";
     records = [];
     elements.password.value = "";
     elements.logoutButton.disabled = false;
@@ -358,8 +385,8 @@ for (const input of [elements.platformFilter, elements.typeFilter, elements.reco
     renderRecords();
   });
 }
-for (const input of [elements.summaryTimeSearch, elements.summaryAddressSearch]) {
-  input.addEventListener("input", () => {
+for (const input of [elements.summaryDateFilter, elements.summaryIpFilter]) {
+  input.addEventListener("change", () => {
     currentPage = 1;
     renderRecords();
   });
@@ -378,7 +405,7 @@ elements.mobileOverviewButton.addEventListener("click", () => {
   elements.mobileOverviewButton.textContent = enabled ? "详细" : "总览";
   currentPage = 1;
   renderRecords();
-  if (enabled) elements.summaryTimeSearch.focus();
+  if (enabled) elements.summaryDateFilter.focus();
 });
 window.matchMedia("(max-width: 768px)").addEventListener("change", () => {
   if (!window.matchMedia("(max-width: 768px)").matches) {
